@@ -29,6 +29,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const user = await storage.getUser(userId);
+      
+      // Auto-create profile on first login if it doesn't exist
+      if (user) {
+        const existingProfile = await storage.getProfile(userId);
+        if (!existingProfile) {
+          const defaultName = user.firstName && user.lastName 
+            ? `${user.firstName} ${user.lastName}` 
+            : user.firstName || user.email?.split('@')[0] || 'User';
+          
+          await storage.createProfile({
+            userId,
+            name: defaultName,
+            bio: null,
+            avatarUrl: user.profileImageUrl || null,
+            googleUrl: null,
+            twitterUrl: null,
+            weiboUrl: null,
+            tiktokUrl: null,
+            isPublic: false, // Profile is private by default until user sets username
+          });
+        }
+      }
+      
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);
@@ -41,6 +64,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     try {
       const userId = req.user.claims.sub;
       const profile = await storage.getProfile(userId);
+      
+      if (!profile) {
+        return res.status(404).json({ message: "Profile not found" });
+      }
+      
       res.json(profile);
     } catch (error) {
       console.error("Error fetching profile:", error);
@@ -63,6 +91,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
   app.patch("/api/profile", isAuthenticated, async (req: any, res) => {
     try {
       const userId = req.user.claims.sub;
+      
+      // If username is being updated, check if it's unique
+      if (req.body.username) {
+        const user = await storage.getUser(userId);
+        if (user && user.username !== req.body.username) {
+          const existingUser = await storage.getUserByUsername(req.body.username);
+          if (existingUser) {
+            return res.status(400).json({ message: "Username already taken" });
+          }
+          // Update username on user table
+          await storage.updateUserUsername(userId, req.body.username);
+        }
+        // Remove username from profile updates (it's stored in users table)
+        delete req.body.username;
+      }
+      
       const profile = await storage.updateProfile(userId, req.body);
       res.json(profile);
     } catch (error) {
@@ -173,8 +217,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { walletAddress, signature } = req.body;
 
-      // TODO: Verify wallet signature
-      // For now, just update the wallet address
+      // TODO: Add signature verification for production
+      // For MVP: storing wallet address without full signature verification
+      // Future: Implement nonce-based challenge and verify signature server-side
+      // using ethers.js: verifyMessage(nonce, signature) === walletAddress
+      
       const user = await storage.updateUserWallet(userId, walletAddress);
       res.json(user);
     } catch (error) {
