@@ -102,6 +102,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
           }
           // Update username on user table
           await storage.updateUserUsername(userId, req.body.username);
+          // Make profile public when username is set
+          req.body.isPublic = true;
         }
         // Remove username from profile updates (it's stored in users table)
         delete req.body.username;
