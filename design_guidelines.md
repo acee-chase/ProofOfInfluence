@@ -1,221 +1,303 @@
-# Design Guidelines: Linktree-Style Web3 Link-in-Bio Platform
+# Design Guidelines: Web3 Link-in-Bio Platform
 
 ## Design Approach
 
-**Reference-Based Design:** Primary inspiration from Linktree with Web3-native enhancements
-**Key References:** Linktree, Rainbow.me (Web3 wallet), Carrd (minimalist link pages)
-**Design Principles:** Mobile-first simplicity, centered hierarchy, wallet-first identity, clean interaction patterns
+**Reference-Based Design:** Linktree's simplicity enhanced with Rainbow.me's Web3 aesthetics and Gradient.page's modern visual treatment
+
+**Core Principles:** 
+- Mobile-first centered hierarchy
+- Gradient-driven visual identity
+- Crypto-native with mainstream accessibility
+- Wallet-first interaction model
+- Professional polish with playful gradients
 
 ## Typography System
 
 **Font Families:**
-- Primary: Inter or DM Sans (modern, highly legible sans-serif)
-- Accent: Space Grotesk for wallet addresses (monospaced aesthetic)
+- Primary: Inter (universal readability, extensive weights)
+- Accent: JetBrains Mono for wallet addresses/technical elements
 
 **Type Scale:**
-- Profile Name: text-2xl md:text-3xl font-bold
-- Bio/Description: text-base md:text-lg font-normal
-- Link Buttons: text-base md:text-lg font-medium
-- Wallet Address: text-sm font-mono
-- Analytics/Metadata: text-xs md:text-sm font-normal
-- Section Headers: text-lg font-semibold
+- Profile Name: text-3xl md:text-4xl font-bold
+- Bio: text-lg md:text-xl font-normal leading-relaxed
+- Link Labels: text-base md:text-lg font-semibold
+- Wallet Address: text-sm font-mono tracking-tight
+- Metadata/Analytics: text-xs md:text-sm
+- Section Headers: text-xl font-bold
+- Button Text: text-base font-semibold
 
 ## Layout System
 
-**Spacing Primitives:** Tailwind units of 2, 4, 6, and 8 for consistency
-- Component padding: p-4 to p-6
-- Section spacing: space-y-4 to space-y-6
-- Container margins: mx-4 md:mx-auto
-- Button gaps: gap-3
+**Spacing Primitives:** Consistent use of 4, 6, 8, and 12 units
+- Container padding: p-6 md:p-8
+- Section spacing: space-y-6 md:space-y-8
+- Component gaps: gap-4 to gap-6
+- Link stack: space-y-4
 
 **Container Strategy:**
-- Main content: max-w-md (448px) centered with mx-auto
-- Full-width sections for edit mode: max-w-4xl
-- Mobile: px-4 py-6
-- Desktop: px-6 py-8
+- Public Profile: max-w-lg (512px) centered, px-4 md:px-6
+- Edit Mode Main: max-w-6xl with two-column layout
+- Analytics Dashboard: max-w-5xl
+- Mobile: Full-width with horizontal padding
 
-**Grid Application:**
-- Single column for public profile (Linktree pattern)
-- Two-column for edit mode: sidebar (preview) + main (controls)
-- Analytics grid: grid-cols-2 for click stats
+**Responsive Grid:**
+- Public: Single column throughout
+- Edit Desktop: 40% preview (sticky) + 60% controls (scrollable)
+- Analytics: grid-cols-1 md:grid-cols-2 lg:grid-cols-3
+- Edit Mobile: Stacked single column
 
 ## Component Library
 
 ### Navigation & Header
-**Web3 Wallet Connection Button:**
-- Prominent placement: top-right of edit mode
-- Two states: "Connect Wallet" (disconnected) / Truncated address (connected)
-- Include wallet icon (MetaMask/WalletConnect logo)
-- Dropdown on click showing full address, disconnect option
-- Copy address functionality with feedback toast
 
-**Edit Mode Navigation:**
-- Fixed top bar with app logo, wallet connection, save/publish buttons
-- Sticky positioning for persistent access
+**Top Navigation Bar (Edit Mode):**
+- Fixed position with backdrop blur effect
+- Three-section layout: Logo (left) + Page Title (center) + Actions (right)
+- Right actions: Preview toggle, Wallet connection, Publish button
+- Height: h-16 with px-6 horizontal padding
+- Subtle border-bottom separator
+
+**Wallet Connection Component:**
+- Disconnected: "Connect Wallet" with wallet icon, px-6 py-2.5
+- Connected: Truncated address (0x1234...5678) with network badge
+- Dropdown menu: Full address with copy, ENS display, network switcher, disconnect
+- Success feedback toast on copy action
+- Network indicator badge (Ethereum/Polygon) with chain icon
 
 ### Profile Section (Public View)
-**Profile Card:**
-- Centered avatar: w-24 h-24 md:w-28 md:h-28, rounded-full with subtle border
-- Profile name directly below (text-2xl md:text-3xl)
-- Bio text (text-base, max-w-xs, centered, text-wrap-balance)
-- Connected wallet address display (truncated with copy button)
-- Total profile views/clicks counter
-- Spacing: space-y-3 between elements
 
-### Link Buttons (Core Component)
-**Design Pattern:**
-- Full-width within container (w-full)
-- Rounded corners: rounded-xl to rounded-2xl
-- Padding: py-4 px-6
-- Typography: text-base md:text-lg font-medium, text-center
-- Stacked vertically with space-y-3
-- Icon support (left-aligned): 20x20 size with mr-3
-- Click count badge (right-aligned, text-xs)
-- Smooth hover lift effect: hover:-translate-y-1 transition-transform
+**Profile Header:**
+- Avatar: w-28 h-28 md:w-32 md:h-32, circular with gradient border ring
+- Name: Directly below avatar, text-3xl md:text-4xl, font-bold, text-center
+- Bio: Max-w-md, text-lg, leading-relaxed, text-center, mt-3
+- Wallet Display: Truncated address with copy button, mt-4
+- Connected badge with pulse animation indicating active wallet
+- Total engagement metrics: "X total clicks" in subtle text-sm
 
-**Link Types:**
-- Standard links (URL)
-- Web3 wallet payment (ETH/crypto address display)
-- Social links with platform icons
-- Email/contact links
+**Gradient Background Treatment:**
+- Animated mesh gradient covering full viewport
+- Subtle grain texture overlay for depth
+- Content maintains high contrast readability
+- Gradient shifts based on user's theme selection
 
-### Edit Mode Components
+### Link Components
 
-**Link Editor Card:**
-- Drag handle icon (left edge, 6-dot grid pattern)
-- Link preview thumbnail
-- Title input field (text-base)
-- URL input field (text-sm, font-mono)
-- Toggle visibility switch
-- Delete button (right edge, trash icon)
-- Spacing: p-4 with gap-3 between inputs
+**Primary Link Button:**
+- Full-width within container, rounded-2xl
+- Padding: py-4 md:py-5, px-6
+- Glass-morphism effect: backdrop-blur with semi-transparent background
+- Platform icon (24x24) aligned left with mr-4
+- Link title: font-semibold, text-base md:text-lg
+- Click counter badge: absolute right-4, text-xs in pill shape
+- Hover: Lift effect (-translate-y-1) with increased backdrop blur
+- Active: Slight scale-down (scale-98)
 
-**Add Link Button:**
-- Full-width, dashed border style
-- Text: "Add New Link" with plus icon
-- Padding: py-6
-- Positioned below existing links
+**Social Link Variants:**
+- Platform-specific branded treatments for Google, X, Weibo, TikTok
+- Icon + platform name + username/handle display
+- Verified badge indicator for claimed profiles
+- Direct link-through on click
 
-**Customization Panel:**
-- Avatar upload zone (circular preview with overlay controls)
-- Profile name input
-- Bio textarea (max 160 characters, counter shown)
-- Theme selector (grid of theme presets)
-- Background options (gradients, solids, patterns)
+**Custom Link Buttons:**
+- Support for custom icons (uploaded or emoji)
+- Thumbnail preview option (40x40, rounded-lg, left-aligned)
+- External link indicator icon on right
+- Title + optional subtitle layout
 
-### Drag-and-Drop Interface
-- Visual grab cursor on hover over drag handle
-- Dragging state: reduced opacity (opacity-60), slight scale (scale-105)
-- Drop zone indicators: dashed borders with subtle highlight
-- Smooth reorder animations: transition-all duration-200
+**Special Web3 Links:**
+- Payment request links: Show crypto amount + currency
+- NFT showcase: Thumbnail + collection name
+- Token gating indicator: Lock icon for exclusive content
 
-### Analytics Dashboard
-**Metrics Display:**
-- Total clicks card: Large number (text-4xl) with label
-- Per-link breakdown: Two-column grid showing link title + click count
-- Chart visualization: Simple bar chart for top 5 links
-- Time period selector: Last 7 days, 30 days, all time
+### Edit Mode Interface
 
-### Web3-Specific Components
+**Live Preview Panel (Left, Sticky):**
+- Exact replica of public profile view
+- Sticky positioning: top-16 (below nav), max-h-screen, overflow-auto
+- Bordered container with subtle shadow
+- Scale factor: 0.85 on desktop for context
+- Real-time updates as user edits
 
-**Wallet Address Display:**
-- Full address on hover/click
-- Truncated format: 0x1234...5678 (first 6, last 4 characters)
-- Etherscan link icon (external link indicator)
-- Copy button with success feedback
-- Network indicator badge (Ethereum, Polygon, etc.)
+**Controls Panel (Right, Scrollable):**
 
-**ENS/Domain Integration:**
-- Display ENS name if available (primary, larger text)
-- Show wallet address as secondary (smaller, beneath ENS)
+**Profile Settings Card:**
+- Avatar upload zone: Circular dropzone, 120x120 preview
+- Drag-drop support with file size limit display
+- Name input: Large text-2xl preview style
+- Bio textarea: 200 character limit with counter, 4 rows min-height
+- Wallet connection status display
+
+**Links Manager:**
+- Draggable card list with grab handles (6-dot grid icon, left edge)
+- Each card contains:
+  - Drag handle (w-8)
+  - Platform/type selector dropdown (icons + labels)
+  - Title input field
+  - URL input (font-mono, text-sm)
+  - Visibility toggle switch (iOS-style)
+  - Analytics preview (click count)
+  - Delete button (trash icon, right edge)
+- Cards: p-5, rounded-xl, border, space-y-3 internal
+- Drag state: opacity-70, scale-102, cursor-grabbing
+- Drop indicators: Dashed borders with highlight between cards
+
+**Add Link Section:**
+- Full-width dashed-border button
+- Text: "Add New Link" with plus icon, py-8
+- Dropdown menu showing link type options:
+  - Social platforms (with icons)
+  - Custom URL
+  - Web3 payment
+  - Email/Contact
+
+**Appearance Customizer:**
+- Theme preset gallery: 3x3 grid of gradient thumbnails
+- Each thumbnail: 80x80, rounded-lg, clickable
+- Selected state: Ring outline with checkmark overlay
+- Custom gradient builder: Dual color picker + angle slider
+- Background pattern selector: Grid, dots, mesh options
+- Button style variants: Glass, solid, outlined
+
+**Analytics Dashboard Card:**
+- Summary metrics row: Total views, total clicks, unique visitors
+- Per-link performance: Table layout with columns: Link name, Clicks, CTR
+- Time period selector: Segmented control (7D, 30D, All Time)
+- Top performing link highlight with trophy icon
+- Export data button (download CSV)
+
+### Airdrop Eligibility Section
+
+**Wallet Verification Panel:**
+- Large checkmark icon when wallet connected
+- "Eligible for Airdrops" status message
+- Connected wallet address display with verification badge
+- Airdrop criteria checklist:
+  - Wallet connected (checkmark)
+  - Profile published (checkmark)
+  - Minimum 3 links added (progress indicator)
+- Notification opt-in toggle for airdrop announcements
+
+### Footer Component (Public Profile)
+
+**Branding Footer:**
+- Centered text: "Built with [Platform Name]"
+- Small logo mark + wordmark
+- Link to create own profile
+- Spacing: mt-16, py-8, text-center, text-sm
 
 ### Forms & Inputs
-**Text Inputs:**
-- Border-style with focus ring
-- Padding: py-3 px-4
-- Rounded: rounded-lg
-- Labels: text-sm font-medium mb-1.5
-- Helper text: text-xs mt-1
+
+**Text Input Fields:**
+- Border style with focus ring expansion
+- Padding: py-3.5 px-4, rounded-lg
+- Label: text-sm font-semibold, mb-2
+- Helper text: text-xs, mt-1.5
+- Error state: Shake animation + error message below
 
 **Toggle Switches:**
-- iOS-style toggle for link visibility
-- Active state clearly distinguished
-- Label placement: left of switch
+- iOS-style sliding toggle, w-11 h-6
+- Smooth transition: transition-all duration-200
+- Active state clearly indicated
+- Label positioned left with mr-3
 
 ### Buttons
-**Primary CTA (Save, Publish):**
-- Padding: py-3 px-8
-- Rounded: rounded-lg
-- Font: text-base font-semibold
-- Width: auto (inline) for navigation, full-width for mobile CTAs
 
-**Secondary Actions (Cancel, Delete):**
-- Outlined or ghost style
-- Same padding/rounding as primary
-- Destructive actions use red accent (without specifying color)
+**Primary CTA (Publish, Save):**
+- Gradient background treatment
+- Padding: py-3.5 px-8, rounded-xl
+- Font: text-base font-bold
+- Shadow on hover: Larger, softer shadow
+- Full-width on mobile, auto on desktop
 
-**Icon Buttons:**
-- Square aspect ratio: w-10 h-10
-- Centered icon: 20x20
-- Rounded: rounded-lg
-- Used for copy, external link, delete, drag handle
+**Secondary Actions:**
+- Ghost style with border
+- Same size/padding as primary
+- Hover: Backdrop fill effect
 
-### Public Profile Layout Structure
-1. **Header**: Profile avatar + name + bio + wallet address (space-y-3)
-2. **Links Section**: Stacked link buttons (space-y-3, mt-8)
-3. **Footer**: Subtle "Powered by [App Name]" badge (mt-12, text-xs)
+**Icon-Only Buttons:**
+- Square: w-10 h-10, rounded-lg
+- Icon size: 20x20, centered
+- Used for: copy, external link, delete, settings
 
-### Edit Mode Layout Structure
-**Two-Panel Layout (Desktop):**
-- Left Panel (40%): Live preview (sticky, max-h-screen overflow-auto)
-- Right Panel (60%): Edit controls (scrollable)
-- Mobile: Single column, preview at top, collapsible
+### Drag-and-Drop System
 
-**Right Panel Sections:**
-1. Profile settings
-2. Links manager (draggable list)
-3. Add link button
-4. Appearance customization
-5. Analytics view (separate tab/section)
+**Visual Feedback:**
+- Grab cursor on hover over handle
+- Dragging: Reduced opacity, slight rotation (rotate-2)
+- Drop zones: Animated dashed borders
+- Reorder animation: smooth transform with spring physics
+- Ghost placeholder during drag
+
+### Analytics Visualizations
+
+**Click Chart:**
+- Horizontal bar chart showing top 5 links
+- Bars: Rounded-lg, gradient fills
+- Labels: Link titles (left), click counts (right)
+- Hover: Tooltip with percentage breakdown
+
+**Metrics Cards:**
+- Grid layout: 3 columns on desktop, stacked mobile
+- Each card: Large number (text-4xl font-bold) + label (text-sm)
+- Icons for each metric type
+- Subtle background gradients
 
 ## Images
 
-**Profile Avatar:** User-uploaded circular photo, 112x112 (desktop), supports PNG/JPG, with upload/crop interface in edit mode
+**Profile Avatar:**
+- User-uploaded, 128x128 minimum resolution
+- Circular crop interface in edit mode
+- Supports PNG, JPG, WebP
+- 5MB file size limit with compression
 
-**Link Thumbnails (Optional):** Small 40x40 icon/logo for branded links (YouTube, Twitter, etc.), displayed to left of link text
+**Social Platform Icons:**
+- Use official brand icon libraries via CDN
+- Size: 24x24 for link buttons, 20x20 for smaller contexts
+- Maintain platform brand guidelines
 
-**Background Patterns:** Decorative gradients or subtle geometric patterns as page backgrounds (not images, generated via CSS)
+**Link Thumbnails:**
+- 48x48 custom uploaded icons/logos
+- Displayed left of link text
+- Automatic favicon fallback for URLs
 
-**No Hero Image Required:** This is a single-page app focused on centered content, not a landing page with hero section
+**Background Patterns:**
+- Procedurally generated mesh gradients (CSS-based)
+- Subtle noise texture overlay for depth
+- No static image backgrounds
+
+**No Hero Section:** This is a single-page profile application with centered content focus, not a marketing site requiring hero treatment
 
 ## Accessibility & Interaction
 
-- All interactive elements: min-height of 44px (touch-friendly)
-- Focus indicators on all interactive elements
-- Keyboard navigation for drag-and-drop (arrow keys + space)
-- ARIA labels for icon-only buttons
-- Screen reader announcements for wallet connection status
-- High contrast between text and backgrounds
-- Alt text for profile avatars
+- Minimum touch target: 44x44px for all interactive elements
+- Focus visible on all controls with 2px offset ring
+- Keyboard navigation: Tab order follows visual hierarchy
+- Drag-drop keyboard alternative: Arrow keys + Space to grab/release
+- ARIA labels on icon-only buttons
+- Screen reader announcements for wallet status changes
+- Live region updates for analytics data
+- Skip links for main content navigation
+
+## Animation Philosophy
+
+**Subtle Motion Design:**
+- Gradient background: Slow 20-second loop animation
+- Link hover: Lift transform (-translate-y-1) in 150ms
+- Wallet connection: Pulse animation on connected badge
+- Drag reorder: Smooth 250ms spring animation
+- Toast notifications: Slide-in-down with fade
+- Loading states: Subtle spinner or skeleton screens
+
+**Avoided Animations:**
+- No parallax scrolling
+- No auto-playing carousels
+- No excessive micro-interactions
+- No scroll-triggered reveals
 
 ## Responsive Breakpoints
 
-- Mobile: Base styles, single column, full-width buttons
-- Tablet (md: 768px): Slightly larger typography, two-column edit layout begins
-- Desktop (lg: 1024px): Optimal two-panel edit view, larger preview size
+- Mobile (base): Single column, touch-optimized spacing
+- Tablet (md: 768px): Enhanced typography, preview panel appears
+- Desktop (lg: 1024px): Two-column edit layout, optimal analytics grid
 
-## Animation Guidelines
-
-**Use Sparingly:**
-- Link button hover lift (subtle, -2px translate)
-- Wallet connection loading spinner
-- Drag-and-drop reorder animations (smooth 200ms transitions)
-- Success toasts (slide-in from top)
-- No parallax, no scroll-triggered animations, no auto-playing elements
-
-**Critical Interactions:**
-- Immediate visual feedback on wallet connection (loading → success state)
-- Smooth reordering when dragging links
-- Toast notifications for copy actions, save confirmations
-
-This design creates a familiar Linktree experience enhanced with Web3 wallet functionality while maintaining simplicity and mobile-first usability.
+This design creates a professional Web3-native link platform that balances crypto sophistication with mainstream usability through gradient-driven aesthetics and wallet-first architecture.
