@@ -42,7 +42,7 @@ export const profiles = pgTable("profiles", {
   googleUrl: text("google_url"),
   twitterUrl: text("twitter_url"),
   weiboUrl: text("weibo_url"),
-  xiaohongshuUrl: text("xiaohongshu_url"),
+  tiktokUrl: text("tiktok_url"),
   // Visibility and analytics
   isPublic: boolean("is_public").default(true).notNull(),
   totalViews: integer("total_views").default(0).notNull(),
@@ -63,32 +63,6 @@ export const links = pgTable("links", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
-// Payments table - one-time payments
-export const payments = pgTable("payments", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  stripePaymentId: text("stripe_payment_id").notNull().unique(),
-  amount: integer("amount").notNull(), // in cents
-  currency: text("currency").default("usd").notNull(),
-  status: text("status").notNull(), // succeeded, pending, failed, canceled
-  metadata: jsonb("metadata"),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
-
-// Subscriptions table
-export const subscriptions = pgTable("subscriptions", {
-  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
-  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  stripeSubscriptionId: text("stripe_subscription_id").notNull().unique(),
-  stripePriceId: text("stripe_price_id").notNull(),
-  status: text("status").notNull(), // active, canceled, past_due, incomplete
-  currentPeriodStart: timestamp("current_period_start"),
-  currentPeriodEnd: timestamp("current_period_end"),
-  cancelAtPeriodEnd: boolean("cancel_at_period_end").default(false).notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
-});
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -120,17 +94,6 @@ export const insertLinkSchema = createInsertSchema(links).omit({
   clicks: true,
 });
 
-export const insertPaymentSchema = createInsertSchema(payments).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
-
-export const insertSubscriptionSchema = createInsertSchema(subscriptions).omit({
-  id: true,
-  createdAt: true,
-  updatedAt: true,
-});
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -142,9 +105,3 @@ export type Profile = typeof profiles.$inferSelect;
 
 export type InsertLink = z.infer<typeof insertLinkSchema>;
 export type Link = typeof links.$inferSelect;
-
-export type InsertPayment = z.infer<typeof insertPaymentSchema>;
-export type Payment = typeof payments.$inferSelect;
-
-export type InsertSubscription = z.infer<typeof insertSubscriptionSchema>;
-export type Subscription = typeof subscriptions.$inferSelect;

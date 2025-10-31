@@ -3,8 +3,6 @@ import {
   users,
   profiles,
   links,
-  payments,
-  subscriptions,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -12,10 +10,6 @@ import {
   type InsertProfile,
   type Link,
   type InsertLink,
-  type Payment,
-  type InsertPayment,
-  type Subscription,
-  type InsertSubscription,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc } from "drizzle-orm";
@@ -45,18 +39,6 @@ export interface IStorage {
   deleteLink(linkId: string): Promise<void>;
   incrementLinkClicks(linkId: string): Promise<void>;
   reorderLinks(userId: string, linkIds: string[]): Promise<void>;
-  
-  // Payment operations
-  createPayment(payment: InsertPayment): Promise<Payment>;
-  updatePayment(paymentId: string, updates: Partial<InsertPayment>): Promise<Payment>;
-  getPayments(userId: string): Promise<Payment[]>;
-  getAllPayments(): Promise<Payment[]>;
-  
-  // Subscription operations
-  createSubscription(subscription: InsertSubscription): Promise<Subscription>;
-  updateSubscription(subscriptionId: string, updates: Partial<InsertSubscription>): Promise<Subscription>;
-  getSubscription(userId: string): Promise<Subscription | undefined>;
-  getAllSubscriptions(): Promise<Subscription[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -182,53 +164,6 @@ export class DatabaseStorage implements IStorage {
         .set({ position: i, updatedAt: new Date() })
         .where(and(eq(links.id, linkIds[i]), eq(links.userId, userId)));
     }
-  }
-
-  // Payment operations
-  async createPayment(payment: InsertPayment): Promise<Payment> {
-    const [newPayment] = await db.insert(payments).values(payment).returning();
-    return newPayment;
-  }
-
-  async updatePayment(paymentId: string, updates: Partial<InsertPayment>): Promise<Payment> {
-    const [payment] = await db
-      .update(payments)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(payments.id, paymentId))
-      .returning();
-    return payment;
-  }
-
-  async getPayments(userId: string): Promise<Payment[]> {
-    return await db.select().from(payments).where(eq(payments.userId, userId)).orderBy(desc(payments.createdAt));
-  }
-
-  async getAllPayments(): Promise<Payment[]> {
-    return await db.select().from(payments).orderBy(desc(payments.createdAt));
-  }
-
-  // Subscription operations
-  async createSubscription(subscription: InsertSubscription): Promise<Subscription> {
-    const [newSub] = await db.insert(subscriptions).values(subscription).returning();
-    return newSub;
-  }
-
-  async updateSubscription(subscriptionId: string, updates: Partial<InsertSubscription>): Promise<Subscription> {
-    const [subscription] = await db
-      .update(subscriptions)
-      .set({ ...updates, updatedAt: new Date() })
-      .where(eq(subscriptions.id, subscriptionId))
-      .returning();
-    return subscription;
-  }
-
-  async getSubscription(userId: string): Promise<Subscription | undefined> {
-    const [subscription] = await db.select().from(subscriptions).where(eq(subscriptions.userId, userId));
-    return subscription;
-  }
-
-  async getAllSubscriptions(): Promise<Subscription[]> {
-    return await db.select().from(subscriptions).orderBy(desc(subscriptions.createdAt));
   }
 }
 
