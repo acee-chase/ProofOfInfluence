@@ -44,13 +44,12 @@ export default function Dashboard() {
   });
 
   const updateProfileMutation = useMutation({
-    mutationFn: async (data: Partial<Profile> & { username?: string }) => {
+    mutationFn: async (data: Partial<Profile>) => {
       const res = await apiRequest("PATCH", "/api/profile", data);
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
-      queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
         title: "Profile updated",
         description: "Your changes have been saved",
@@ -131,7 +130,7 @@ export default function Dashboard() {
     deleteLinkMutation.mutate(id);
   };
 
-  const handleUpdateProfile = (updates: Partial<Profile> & { username?: string }) => {
+  const handleUpdateProfile = (updates: Partial<Profile>) => {
     updateProfileMutation.mutate(updates);
   };
 
@@ -206,8 +205,7 @@ export default function Dashboard() {
             <div className="max-w-2xl mx-auto">
               {profile && (
                 <ProfileEditor 
-                  profile={profile}
-                  username={user?.username}
+                  profile={profile} 
                   onUpdate={handleUpdateProfile}
                   isPending={updateProfileMutation.isPending}
                 />
