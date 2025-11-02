@@ -11,6 +11,9 @@ export interface LinkEditorData {
   url: string;
   visible: boolean;
   clicks: number;
+  position?: number;
+  isNew?: boolean;
+  isDirty?: boolean;
 }
 
 interface LinkEditorProps {
@@ -18,9 +21,10 @@ interface LinkEditorProps {
   onUpdate: (id: string, updates: Partial<LinkEditorData>) => void;
   onDelete: (id: string) => void;
   dragHandleProps?: any;
+  disabled?: boolean;
 }
 
-export default function LinkEditor({ link, onUpdate, onDelete, dragHandleProps }: LinkEditorProps) {
+export default function LinkEditor({ link, onUpdate, onDelete, dragHandleProps, disabled }: LinkEditorProps) {
   return (
     <Card className="p-4" data-testid={`link-editor-${link.id}`}>
       <div className="flex items-start gap-3">
@@ -43,6 +47,7 @@ export default function LinkEditor({ link, onUpdate, onDelete, dragHandleProps }
               onChange={(e) => onUpdate(link.id, { title: e.target.value })}
               placeholder="Link title"
               data-testid={`input-title-${link.id}`}
+              disabled={disabled}
             />
           </div>
 
@@ -57,6 +62,7 @@ export default function LinkEditor({ link, onUpdate, onDelete, dragHandleProps }
               placeholder="https://example.com"
               className="font-mono text-sm"
               data-testid={`input-url-${link.id}`}
+              disabled={disabled}
             />
           </div>
 
@@ -67,6 +73,7 @@ export default function LinkEditor({ link, onUpdate, onDelete, dragHandleProps }
                 checked={link.visible}
                 onCheckedChange={(checked) => onUpdate(link.id, { visible: checked })}
                 data-testid={`switch-visible-${link.id}`}
+                disabled={disabled}
               />
               <Label htmlFor={`visible-${link.id}`} className="text-sm flex items-center gap-1.5">
                 {link.visible ? <Eye className="h-4 w-4" /> : <EyeOff className="h-4 w-4" />}
@@ -86,6 +93,7 @@ export default function LinkEditor({ link, onUpdate, onDelete, dragHandleProps }
           onClick={() => onDelete(link.id)}
           className="flex-shrink-0"
           data-testid={`button-delete-${link.id}`}
+          disabled={disabled}
         >
           <Trash2 className="h-4 w-4" />
         </Button>
