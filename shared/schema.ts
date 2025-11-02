@@ -78,6 +78,7 @@ export const upsertUserSchema = createInsertSchema(users).pick({
   firstName: true,
   lastName: true,
   profileImageUrl: true,
+  username: true,
 });
 
 export const insertProfileSchema = createInsertSchema(profiles).omit({

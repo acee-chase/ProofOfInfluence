@@ -205,7 +205,8 @@ export default function Dashboard() {
             <div className="max-w-2xl mx-auto">
               {profile && (
                 <ProfileEditor 
-                  profile={profile} 
+                  profile={profile}
+                  username={user?.username}
                   onUpdate={handleUpdateProfile}
                   isPending={updateProfileMutation.isPending}
                 />

@@ -54,25 +54,19 @@ export default function ProfileEditor({ profile, username, onUpdate, isPending }
         </div>
 
         <div>
-          <Label htmlFor="username" className="text-sm font-medium mb-1.5 block">
-            Username
+          <Label className="text-sm font-medium mb-1.5 block">
+            Profile URL
           </Label>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">/</span>
-            <Input
-              id="username"
-              value={username || ""}
-              onChange={(e) => {
-                const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
-                onUpdate({ username: value });
-              }}
-              placeholder="your-username"
-              data-testid="input-username"
-              disabled={isPending}
-            />
+          <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-md border text-sm">
+            <span className="text-muted-foreground font-mono">
+              {typeof window !== 'undefined' ? window.location.origin : ''}/
+            </span>
+            <span className="font-mono font-medium" data-testid="username-display">
+              {username || "loading..."}
+            </span>
           </div>
-          <p className="text-xs text-muted-foreground mt-1">
-            Your public profile will be available at /{username || "your-username"}
+          <p className="text-xs text-muted-foreground mt-1.5">
+            This is your permanent profile URL. Share it to showcase your links.
           </p>
         </div>
 
