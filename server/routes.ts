@@ -1,5 +1,5 @@
 // Backend API routes - includes Replit Auth integration from blueprint:javascript_log_in_with_replit
-import type { Express, Request } from "express";
+import express, { type Express, type Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
