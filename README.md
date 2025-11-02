@@ -25,48 +25,37 @@ ProofOfInfluence 提供一个类似 Linktree 的个人链接聚合页面，并�
 - **Drizzle ORM**（PostgreSQL）
 - **Replit Auth** 以及计划中的 Web3 扩展
 
-## 🚀 快速开始
-### 前置要求
-- Node.js 20+
-- PostgreSQL 数据库（推荐 Neon）
-- Git
+## 🚀 Replit 部署
 
-### 1. 克隆项目
-```bash
-git clone https://github.com/你的用户名/ProofOfInfluence.git
-cd ProofOfInfluence
+本项目**仅在 Replit 上部署和运行**，不支持本地开发。
+
+### 1. Fork 项目到 Replit
+1. 访问 [Replit](https://replit.com/)
+2. 点击 "Create Repl" → "Import from GitHub"
+3. 输入仓库 URL：`https://github.com/chickendinner-chase/ProofOfInfluence`
+
+### 2. 配置 Secrets（环境变量）
+在 Replit 中点击 **Secrets**（锁图标），添加以下密钥：
+
+```
+DATABASE_URL=你的Neon数据库URL
+SESSION_SECRET=随机生成的密钥
+STRIPE_SECRET_KEY=你的Stripe密钥
+STRIPE_PUBLISHABLE_KEY=你的Stripe公钥
+BASE_URL=你的Replit应用URL
 ```
 
-### 2. 安装依赖
-```bash
-npm install
-```
-
-### 3. 配置环境变量
-在根目录创建 `.env.local`：
-```bash
-DATABASE_URL=postgresql://user:password@host:5432/database
-SESSION_SECRET=your-random-secret-here
-STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key
-STRIPE_PUBLISHABLE_KEY=pk_test_your_stripe_publishable_key
-BASE_URL=http://localhost:5173
-PORT=5000
-NODE_ENV=development
-```
-
-**Stripe支付配置**：参考 [docs/STRIPE_SETUP.md](docs/STRIPE_SETUP.md) 获取详细设置指南。  
-**其他环境变量**：见 [STRIPE_ENV_TEMPLATE.md](STRIPE_ENV_TEMPLATE.md)。
-
-### 4. 初始化数据库
+### 3. 初始化数据库
+在 Replit Shell 运行：
 ```bash
 npm run db:push
 ```
 
-### 5. 启动开发服务器
-```bash
-npm run dev
-```
-访问 http://localhost:5173 查看效果。
+### 4. 运行项目
+点击 Replit 的 **Run** 按钮，项目会自动启动。
+
+### 5. 自动部署
+推送到 GitHub 后，Replit 会自动检测变更并重新部署。
 
 ## 📁 项目结构
 ```
@@ -88,10 +77,9 @@ ProofOfInfluence/
 ```
 
 ## 📖 文档
-- [docs/STRIPE_SETUP.md](docs/STRIPE_SETUP.md)：💳 Stripe支付集成完整指南
-- [STRIPE_ENV_TEMPLATE.md](STRIPE_ENV_TEMPLATE.md)：环境变量模板
-- [docs/PROJECT.md](docs/PROJECT.md)：架构、API 与数据模型详解
-- [collaboration/README.md](collaboration/README.md)：精简版 AI 协作流程备忘
+- [docs/STRIPE_SETUP.md](docs/STRIPE_SETUP.md)：💳 Stripe支付配置（Replit）
+- [replit.yaml](replit.yaml)：Replit 部署配置
+- [design_guidelines.md](design_guidelines.md)：UI/UX 设计规范
 
 ## 🎯 路线图
 ### ✅ MVP

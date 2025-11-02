@@ -1,97 +1,73 @@
-# Stripe Payment Setup Guide
+# Stripe Payment Setup Guide (Replit)
 
-This guide will help you configure Stripe payment integration for ProofOfInfluence.
+本项目仅在 Replit 部署，以下是 Stripe 支付配置步骤。
 
-## Prerequisites
+## Step 1: 获取 Stripe API 密钥
 
-- A Stripe account ([sign up here](https://dashboard.stripe.com/register))
-- Access to your Stripe API keys
+1. 访问 [Stripe Dashboard](https://dashboard.stripe.com/) 并登录
+2. 点击左侧 **Developers**
+3. 点击 **API keys**
+4. 复制两个密钥：
+   - **Publishable key**（公钥，以 `pk_test_` 或 `pk_live_` 开头）
+   - **Secret key**（密钥，以 `sk_test_` 或 `sk_live_` 开头）
 
-## Step 1: Get Stripe API Keys
+## Step 2: 在 Replit 配置环境变量
 
-1. Log in to your [Stripe Dashboard](https://dashboard.stripe.com/)
-2. Click on **Developers** in the left sidebar
-3. Click on **API keys**
-4. You'll see two keys:
-   - **Publishable key** (starts with `pk_test_` for test mode)
-   - **Secret key** (starts with `sk_test_` for test mode)
+1. 打开你的 Replit 项目
+2. 点击左侧工具栏的 **Secrets**（🔒 锁图标）
+3. 添加以下 Secrets：
 
-## Step 2: Configure Environment Variables
+| Key | Value | 说明 |
+|-----|-------|------|
+| `STRIPE_SECRET_KEY` | `sk_test_...` 或 `sk_live_...` | Stripe 密钥 |
+| `STRIPE_PUBLISHABLE_KEY` | `pk_test_...` 或 `pk_live_...` | Stripe 公钥 |
+| `BASE_URL` | `https://your-repl.replit.app` | 你的 Replit 应用 URL |
 
-### For Local Development
+> 💡 **测试模式**：使用 `sk_test_` 和 `pk_test_` 开头的密钥  
+> 🔴 **生产模式**：使用 `sk_live_` 和 `pk_live_` 开头的密钥
 
-1. Copy `.env.example` to `.env.local`:
-   ```bash
-   cp .env.example .env.local
-   ```
+## Step 3: 测试支付功能
 
-2. Add your Stripe keys to `.env.local`:
-   ```bash
-   STRIPE_SECRET_KEY=sk_test_your_actual_secret_key_here
-   STRIPE_PUBLISHABLE_KEY=pk_test_your_actual_publishable_key_here
-   BASE_URL=http://localhost:5173
-   ```
+### 测试卡号
 
-### For Production (Replit)
+Stripe 提供测试卡号用于开发测试：
 
-1. Open your Repl in Replit
-2. Click on the **Secrets** tool (lock icon in left sidebar)
-3. Add the following secrets:
-   - Key: `STRIPE_SECRET_KEY`, Value: `sk_live_your_live_secret_key`
-   - Key: `STRIPE_PUBLISHABLE_KEY`, Value: `pk_live_your_live_publishable_key`
-   - Key: `BASE_URL`, Value: `https://your-repl-url.replit.app`
+**成功支付:**
+- 卡号: `4242 4242 4242 4242`
+- 有效期: 任何未来日期
+- CVC: 任意3位数
+- 邮编: 任意5位数
 
-## Step 3: Test the Integration
+**拒绝支付（测试错误）:**
+- 卡号: `4000 0000 0000 0002`
 
-### Using Test Mode
+### 测试步骤
 
-Stripe provides test mode for development. Use these test card numbers:
+1. 点击 Replit 的 **Run** 按钮启动项目
+2. 访问你的 Replit 应用 URL
+3. 在 Landing 页面选择支付用途和金额
+4. 点击 "Pay" 按钮
+5. 重定向到 Stripe Checkout
+6. 使用测试卡号完成支付
+7. 成功后会重定向到 `/payment-success` 页面
 
-**Successful Payment:**
-- Card number: `4242 4242 4242 4242`
-- Expiry: Any future date
-- CVC: Any 3 digits
-- ZIP: Any 5 digits
+## Step 4: 切换到生产模式
 
-**Declined Payment (for testing errors):**
-- Card number: `4000 0000 0000 0002`
+准备接受真实支付时：
 
-### Testing Steps
+1. **激活 Stripe 账户:**
+   - 在 Stripe Dashboard 完成企业验证
+   - 添加银行账户用于收款
 
-1. Start your development server:
-   ```bash
-   npm run dev
-   ```
+2. **切换到生产密钥:**
+   - 在 Stripe Dashboard 切换到 "Live mode"
+   - 复制 **生产** API 密钥（以 `sk_live_` 和 `pk_live_` 开头）
+   - 在 Replit Secrets 中更新密钥
 
-2. Visit http://localhost:5173
-
-3. Select a payment purpose and amount
-
-4. Click the "Pay" button
-
-5. You'll be redirected to Stripe Checkout
-
-6. Use a test card number to complete payment
-
-7. You should be redirected to `/payment-success`
-
-## Step 4: Go Live (Production)
-
-When you're ready to accept real payments:
-
-1. **Activate your Stripe account:**
-   - Complete business verification in Stripe Dashboard
-   - Add bank account for payouts
-
-2. **Switch to live keys:**
-   - In Stripe Dashboard, toggle from "Test mode" to "Live mode"
-   - Copy your **live** API keys (start with `sk_live_` and `pk_live_`)
-   - Update your production environment variables
-
-3. **Test with a real card:**
-   - Use a real credit card with a small amount
-   - Verify the payment appears in your Stripe Dashboard
-   - Refund the test payment if needed
+3. **真实测试:**
+   - 使用真实信用卡测试小额支付
+   - 在 Stripe Dashboard 验证支付记录
+   - 如需要可退款测试支付
 
 ## Payment Options
 
@@ -105,31 +81,30 @@ The integration supports flexible pricing with these purposes:
 
 Users can also enter custom amounts between $1 and $10,000.
 
-## Security Notes
+## 安全注意事项
 
-- **Never commit** `.env.local` or actual API keys to Git
-- The `.env.local` file is already in `.gitignore`
-- Use **test keys** (`sk_test_*`) for development
-- Use **live keys** (`sk_live_*`) only in production
-- Keep your Secret Key secure - never expose it in client-side code
+- ✅ 所有密钥配置在 Replit Secrets，不要提交到 Git
+- ✅ 开发测试使用 `sk_test_*` 密钥
+- ✅ 生产环境使用 `sk_live_*` 密钥
+- ✅ Secret Key 仅在后端使用，不要暴露在客户端代码
 
-## Troubleshooting
+## 常见问题
 
-### Error: "Stripe Secret Key is not set"
+### 错误: "Stripe Secret Key is not set"
 
-- Check that `STRIPE_SECRET_KEY` is configured in your environment
-- Restart your dev server after adding environment variables
+- 检查 Replit Secrets 中是否配置了 `STRIPE_SECRET_KEY`
+- 在 Replit Shell 重启服务
 
-### Error: "Failed to create checkout session"
+### 错误: "Failed to create checkout session"
 
-- Verify your Stripe secret key is correct
-- Check that the amount is between $1 and $10,000
-- Ensure you have internet connection (Stripe API requires it)
+- 验证 Stripe 密钥正确
+- 确认金额在 $1 - $10,000 范围内
+- 检查 Replit 网络连接
 
-### Payment succeeds but redirects to 404
+### 支付成功但跳转到 404
 
-- Check that `BASE_URL` is set correctly in your environment
-- Verify the `/payment-success` route is working
+- 检查 Replit Secrets 中的 `BASE_URL` 是否正确
+- 验证 `/payment-success` 路由是否正常工作
 
 ### Webhook Issues (Future Enhancement)
 

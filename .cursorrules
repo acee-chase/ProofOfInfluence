@@ -3,12 +3,20 @@
 ## 项目概述
 Web3 link-in-bio 平台（类似 Linktree + Web3）：用户可创建个性化展示页面，集成钱包功能，追踪影响力数据。
 
+## 🚨 重要：仅 Replit 部署
+- **不做本地部署** - 所有开发和部署都在 Replit 上进行
+- **不要提及本地环境** - 不要建议用户运行 npm run dev 或配置 .env.local
+- **所有配置在 Replit Secrets** - 环境变量统一在 Replit Secrets 配置
+- **自动部署** - Git push 后 Replit 自动部署
+
 ## 技术栈
 - **Frontend**: React 18, TypeScript, Vite, TailwindCSS, Shadcn UI
 - **Backend**: Express, TypeScript, Drizzle ORM, PostgreSQL (Neon)
 - **Auth**: Replit Auth (Google OAuth) + MetaMask Web3
+- **Payment**: Stripe Checkout (灵活定价)
 - **State**: TanStack Query (React Query)
 - **Routing**: Wouter
+- **Deployment**: Replit Autoscale (自动部署)
 
 ## 开发规范
 
@@ -86,6 +94,7 @@ shared/
 - **小步快跑**: 每次修改保持小范围（单个功能/组件）
 - **快速迭代**: 功能能用就先上线，性能优化后续进行
 - **延迟抽象**: 不要过早抽象，先让代码工作起来
+- **Replit Only**: 所有开发和部署都在 Replit，不涉及本地环境
 
 ## 命名规范
 - 组件文件：PascalCase (例：ProfileEditor.tsx)
