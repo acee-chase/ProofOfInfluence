@@ -3,19 +3,30 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Upload } from "lucide-react";
+import { Save, Upload } from "lucide-react";
 import { SiGoogle, SiX, SiSinaweibo, SiTiktok } from "react-icons/si";
 import ProfileAvatar from "./ProfileAvatar";
 import type { Profile } from "@shared/schema";
 
+export type ProfileData = Pick<Profile, "name" | "bio" | "avatarUrl" | "googleUrl" | "twitterUrl" | "weiboUrl" | "tiktokUrl" | "isPublic">;
+
 interface ProfileEditorProps {
-  profile: Profile;
+  profile: ProfileData;
   username?: string | null;
-  onUpdate: (updates: Partial<Profile> & { username?: string }) => void;
-  isPending?: boolean;
+  onChange: (updates: Partial<ProfileData> & { username?: string }) => void;
+  onSave: () => void;
+  canSave: boolean;
+  isSaving?: boolean;
 }
 
-export default function ProfileEditor({ profile, username, onUpdate, isPending }: ProfileEditorProps) {
+export default function ProfileEditor({
+  profile,
+  username,
+  onChange,
+  onSave,
+  canSave,
+  isSaving,
+}: ProfileEditorProps) {
   const handleAvatarUpload = () => {
     console.log("Avatar upload clicked");
   };
@@ -46,10 +57,10 @@ export default function ProfileEditor({ profile, username, onUpdate, isPending }
           <Input
             id="profile-name"
             value={profile.name}
-            onChange={(e) => onUpdate({ name: e.target.value })}
+            onChange={(e) => onChange({ name: e.target.value })}
             placeholder="Your name"
             data-testid="input-profile-name"
-            disabled={isPending}
+            disabled={isSaving}
           />
         </div>
 
@@ -64,11 +75,11 @@ export default function ProfileEditor({ profile, username, onUpdate, isPending }
               value={username || ""}
               onChange={(e) => {
                 const value = e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '');
-                onUpdate({ username: value });
+                onChange({ username: value });
               }}
               placeholder="your-username"
               data-testid="input-username"
-              disabled={isPending}
+              disabled={isSaving}
             />
           </div>
           <p className="text-xs text-muted-foreground mt-1">
@@ -83,12 +94,12 @@ export default function ProfileEditor({ profile, username, onUpdate, isPending }
           <Textarea
             id="profile-bio"
             value={profile.bio || ""}
-            onChange={(e) => onUpdate({ bio: e.target.value })}
+            onChange={(e) => onChange({ bio: e.target.value })}
             placeholder="Tell people about yourself"
             maxLength={maxBioLength}
             rows={3}
             data-testid="input-profile-bio"
-            disabled={isPending}
+            disabled={isSaving}
           />
           <p className="text-xs text-muted-foreground mt-1" data-testid="text-bio-count">
             {bioLength}/{maxBioLength} characters
@@ -106,10 +117,10 @@ export default function ProfileEditor({ profile, username, onUpdate, isPending }
               <Input
                 id="google-url"
                 value={profile.googleUrl || ""}
-                onChange={(e) => onUpdate({ googleUrl: e.target.value || null })}
+                onChange={(e) => onChange({ googleUrl: e.target.value || null })}
                 placeholder="https://..."
                 data-testid="input-google-url"
-                disabled={isPending}
+                disabled={isSaving}
               />
             </div>
 
@@ -121,10 +132,10 @@ export default function ProfileEditor({ profile, username, onUpdate, isPending }
               <Input
                 id="twitter-url"
                 value={profile.twitterUrl || ""}
-                onChange={(e) => onUpdate({ twitterUrl: e.target.value || null })}
+                onChange={(e) => onChange({ twitterUrl: e.target.value || null })}
                 placeholder="https://x.com/..."
                 data-testid="input-twitter-url"
-                disabled={isPending}
+                disabled={isSaving}
               />
             </div>
 
@@ -136,10 +147,10 @@ export default function ProfileEditor({ profile, username, onUpdate, isPending }
               <Input
                 id="weibo-url"
                 value={profile.weiboUrl || ""}
-                onChange={(e) => onUpdate({ weiboUrl: e.target.value || null })}
+                onChange={(e) => onChange({ weiboUrl: e.target.value || null })}
                 placeholder="https://weibo.com/..."
                 data-testid="input-weibo-url"
-                disabled={isPending}
+                disabled={isSaving}
               />
             </div>
 
@@ -151,13 +162,24 @@ export default function ProfileEditor({ profile, username, onUpdate, isPending }
               <Input
                 id="tiktok-url"
                 value={profile.tiktokUrl || ""}
-                onChange={(e) => onUpdate({ tiktokUrl: e.target.value || null })}
+                onChange={(e) => onChange({ tiktokUrl: e.target.value || null })}
                 placeholder="https://tiktok.com/@..."
                 data-testid="input-tiktok-url"
-                disabled={isPending}
+                disabled={isSaving}
               />
             </div>
           </div>
+        </div>
+
+        <div className="flex justify-end pt-2">
+          <Button
+            onClick={onSave}
+            disabled={!canSave || isSaving}
+            data-testid="button-save-profile"
+          >
+            <Save className="mr-2 h-4 w-4" />
+            Save Changes
+          </Button>
         </div>
       </div>
     </Card>

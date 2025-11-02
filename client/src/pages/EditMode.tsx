@@ -20,7 +20,14 @@ export default function EditMode() {
     name: "John Doe",
     bio: "Web3 enthusiast | Developer | Creator",
     avatarUrl: undefined,
+    googleUrl: null,
+    twitterUrl: null,
+    weiboUrl: null,
+    tiktokUrl: null,
+    isPublic: true,
   });
+  const [username, setUsername] = useState("johndoe");
+  const [profileDirty, setProfileDirty] = useState(false);
 
   const [links, setLinks] = useState<LinkEditorData[]>([
     { id: "1", title: "My Website", url: "https://example.com", clicks: 1234, visible: true },
@@ -43,8 +50,26 @@ export default function EditMode() {
     });
   };
 
-  const handleUpdateProfile = (updates: Partial<ProfileData>) => {
-    setProfile((prev) => ({ ...prev, ...updates }));
+  const handleProfileEditorChange = (updates: Partial<ProfileData> & { username?: string }) => {
+    const { username: nextUsername, ...profileUpdates } = updates;
+
+    if (Object.keys(profileUpdates).length > 0) {
+      setProfile((prev) => ({ ...prev, ...profileUpdates }));
+      setProfileDirty(true);
+    }
+
+    if (nextUsername !== undefined) {
+      setUsername(nextUsername);
+      setProfileDirty(true);
+    }
+  };
+
+  const handleProfileSave = () => {
+    toast({
+      title: "Changes saved",
+      description: "Your profile has been updated successfully",
+    });
+    setProfileDirty(false);
   };
 
   const handleUpdateLink = (id: string, updates: Partial<LinkEditorData>) => {
@@ -70,10 +95,7 @@ export default function EditMode() {
   };
 
   const handleSave = () => {
-    toast({
-      title: "Changes saved",
-      description: "Your profile has been updated successfully",
-    });
+    handleProfileSave();
   };
 
   const totalClicks = links.reduce((sum, link) => sum + link.clicks, 0);
@@ -94,7 +116,7 @@ export default function EditMode() {
             Close Preview
           </Button>
         </div>
-        <PublicProfile profile={previewProfile} username="johndoe" />
+        <PublicProfile profile={previewProfile} username={username || "johndoe"} />
       </div>
     );
   }
@@ -113,7 +135,7 @@ export default function EditMode() {
               <Eye className="mr-2 h-4 w-4" />
               Preview
             </Button>
-            <Button onClick={handleSave} data-testid="button-save">
+            <Button onClick={handleSave} data-testid="button-save" disabled={!profileDirty}>
               <Save className="mr-2 h-4 w-4" />
               Save
             </Button>
@@ -157,7 +179,14 @@ export default function EditMode() {
 
           <TabsContent value="profile">
             <div className="max-w-2xl mx-auto">
-              <ProfileEditor profile={profile} onUpdate={handleUpdateProfile} />
+              <ProfileEditor
+                profile={profile}
+                username={username}
+                onChange={handleProfileEditorChange}
+                onSave={handleProfileSave}
+                canSave={profileDirty}
+                isSaving={false}
+              />
             </div>
           </TabsContent>
 
