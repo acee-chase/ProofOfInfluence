@@ -4,6 +4,10 @@ import {
   profiles,
   links,
   transactions,
+  poiTiers,
+  poiFeeCredits,
+  poiBurnIntents,
+  poiFeeCreditLocks,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -13,9 +17,17 @@ import {
   type InsertLink,
   type Transaction,
   type InsertTransaction,
+  type PoiTier,
+  type InsertPoiTier,
+  type PoiFeeCredit,
+  type InsertPoiFeeCredit,
+  type PoiBurnIntent,
+  type InsertPoiBurnIntent,
+  type PoiFeeCreditLock,
+  type InsertPoiFeeCreditLock,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, desc, sql, gte } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -50,6 +62,25 @@ export interface IStorage {
   getTransactionBySessionId(sessionId: string): Promise<Transaction | undefined>;
   updateTransaction(id: string, updates: Partial<InsertTransaction>): Promise<Transaction>;
   getUserTransactions(userId: string): Promise<Transaction[]>;
+  
+  // POI Tier operations
+  getAllTiers(): Promise<PoiTier[]>;
+  getUserTier(poiBalance: number): Promise<PoiTier | undefined>;
+  
+  // POI Fee Credit operations
+  getFeeCredit(userId: string): Promise<PoiFeeCredit | undefined>;
+  createFeeCredit(feeCredit: InsertPoiFeeCredit): Promise<PoiFeeCredit>;
+  updateFeeCreditBalance(userId: string, amountCents: number): Promise<PoiFeeCredit>;
+  
+  // POI Burn Intent operations
+  createBurnIntent(burnIntent: InsertPoiBurnIntent): Promise<PoiBurnIntent>;
+  getBurnIntentByTxHash(txHash: string): Promise<PoiBurnIntent | undefined>;
+  
+  // POI Fee Credit Lock operations
+  createFeeCreditLock(lock: InsertPoiFeeCreditLock): Promise<PoiFeeCreditLock>;
+  getFeeCreditLock(orderId: string): Promise<PoiFeeCreditLock | undefined>;
+  updateFeeCreditLockStatus(lockId: string, status: string): Promise<PoiFeeCreditLock>;
+  releaseFeeCreditLock(orderId: string): Promise<void>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -220,6 +251,115 @@ export class DatabaseStorage implements IStorage {
       .from(transactions)
       .where(eq(transactions.userId, userId))
       .orderBy(desc(transactions.createdAt));
+  }
+
+  // POI Tier operations
+  async getAllTiers(): Promise<PoiTier[]> {
+    return await db
+      .select()
+      .from(poiTiers)
+      .orderBy(poiTiers.minPoi);
+  }
+
+  async getUserTier(poiBalance: number): Promise<PoiTier | undefined> {
+    const tiers = await db
+      .select()
+      .from(poiTiers)
+      .where(gte(sql`${poiBalance}`, poiTiers.minPoi))
+      .orderBy(desc(poiTiers.minPoi))
+      .limit(1);
+    return tiers[0];
+  }
+
+  // POI Fee Credit operations
+  async getFeeCredit(userId: string): Promise<PoiFeeCredit | undefined> {
+    const [feeCredit] = await db
+      .select()
+      .from(poiFeeCredits)
+      .where(eq(poiFeeCredits.userId, userId));
+    return feeCredit;
+  }
+
+  async createFeeCredit(feeCredit: InsertPoiFeeCredit): Promise<PoiFeeCredit> {
+    const [newFeeCredit] = await db
+      .insert(poiFeeCredits)
+      .values(feeCredit)
+      .returning();
+    return newFeeCredit;
+  }
+
+  async updateFeeCreditBalance(userId: string, amountCents: number): Promise<PoiFeeCredit> {
+    // Check if user has fee credit record
+    const existing = await this.getFeeCredit(userId);
+    
+    if (!existing) {
+      // Create new record
+      return await this.createFeeCredit({
+        userId,
+        balanceCents: amountCents,
+      });
+    }
+
+    // Update existing record
+    const [updated] = await db
+      .update(poiFeeCredits)
+      .set({
+        balanceCents: sql`${poiFeeCredits.balanceCents} + ${amountCents}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(poiFeeCredits.userId, userId))
+      .returning();
+    return updated;
+  }
+
+  // POI Burn Intent operations
+  async createBurnIntent(burnIntent: InsertPoiBurnIntent): Promise<PoiBurnIntent> {
+    const [newBurnIntent] = await db
+      .insert(poiBurnIntents)
+      .values(burnIntent)
+      .returning();
+    return newBurnIntent;
+  }
+
+  async getBurnIntentByTxHash(txHash: string): Promise<PoiBurnIntent | undefined> {
+    const [burnIntent] = await db
+      .select()
+      .from(poiBurnIntents)
+      .where(eq(poiBurnIntents.burnTxHash, txHash));
+    return burnIntent;
+  }
+
+  // POI Fee Credit Lock operations
+  async createFeeCreditLock(lock: InsertPoiFeeCreditLock): Promise<PoiFeeCreditLock> {
+    const [newLock] = await db
+      .insert(poiFeeCreditLocks)
+      .values(lock)
+      .returning();
+    return newLock;
+  }
+
+  async getFeeCreditLock(orderId: string): Promise<PoiFeeCreditLock | undefined> {
+    const [lock] = await db
+      .select()
+      .from(poiFeeCreditLocks)
+      .where(eq(poiFeeCreditLocks.orderId, orderId));
+    return lock;
+  }
+
+  async updateFeeCreditLockStatus(lockId: string, status: string): Promise<PoiFeeCreditLock> {
+    const [updated] = await db
+      .update(poiFeeCreditLocks)
+      .set({ status, updatedAt: new Date() })
+      .where(eq(poiFeeCreditLocks.id, lockId))
+      .returning();
+    return updated;
+  }
+
+  async releaseFeeCreditLock(orderId: string): Promise<void> {
+    await db
+      .update(poiFeeCreditLocks)
+      .set({ status: 'released', updatedAt: new Date() })
+      .where(eq(poiFeeCreditLocks.orderId, orderId));
   }
 }
 

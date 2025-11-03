@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, jsonb, index, bigint, numeric, serial } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -79,6 +79,47 @@ export const transactions = pgTable("transactions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// POI Tiers - membership levels based on POI balance/staking
+export const poiTiers = pgTable("poi_tiers", {
+  id: serial("id").primaryKey(),
+  name: text("name").notNull(),
+  minPoi: bigint("min_poi", { mode: "number" }).notNull(), // Min POI balance required
+  feeDiscountRate: numeric("fee_discount_rate", { precision: 5, scale: 4 }).notNull().default("0"), // 0.10 = 10% discount
+  shippingCreditCapCents: integer("shipping_credit_cap_cents").notNull().default(0), // Max shipping credit in cents
+});
+
+// POI Fee Credits - non-transferable credits from burning POI
+export const poiFeeCredits = pgTable("poi_fee_credits", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  balanceCents: bigint("balance_cents", { mode: "number" }).notNull().default(0), // Available fee credit balance in cents
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// POI Burn Intents - record of POI burns for fee credits
+export const poiBurnIntents = pgTable("poi_burn_intents", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  burnTxHash: text("burn_tx_hash").notNull().unique(), // Blockchain transaction hash
+  poiAmount: bigint("poi_amount", { mode: "number" }).notNull(), // Amount of POI burned
+  creditedCents: bigint("credited_cents", { mode: "number" }).notNull(), // Fee credits received in cents
+  snapshotRate: numeric("snapshot_rate", { precision: 18, scale: 8 }).notNull(), // POI to USD rate at burn time
+  status: varchar("status").default("credited").notNull(), // credited, verified, rejected
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// POI Fee Credit Locks - prevents double-spending during checkout
+export const poiFeeCreditLocks = pgTable("poi_fee_credit_locks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  orderId: varchar("order_id").notNull(),
+  lockedCents: bigint("locked_cents", { mode: "number" }).notNull(), // Amount locked
+  status: varchar("status").default("locked").notNull(), // locked, consumed, released
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
@@ -116,6 +157,27 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   updatedAt: true,
 });
 
+export const insertPoiTierSchema = createInsertSchema(poiTiers).omit({
+  id: true,
+});
+
+export const insertPoiFeeCreditSchema = createInsertSchema(poiFeeCredits).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertPoiBurnIntentSchema = createInsertSchema(poiBurnIntents).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertPoiFeeCreditLockSchema = createInsertSchema(poiFeeCreditLocks).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -130,3 +192,15 @@ export type Link = typeof links.$inferSelect;
 
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
+
+export type InsertPoiTier = z.infer<typeof insertPoiTierSchema>;
+export type PoiTier = typeof poiTiers.$inferSelect;
+
+export type InsertPoiFeeCredit = z.infer<typeof insertPoiFeeCreditSchema>;
+export type PoiFeeCredit = typeof poiFeeCredits.$inferSelect;
+
+export type InsertPoiBurnIntent = z.infer<typeof insertPoiBurnIntentSchema>;
+export type PoiBurnIntent = typeof poiBurnIntents.$inferSelect;
+
+export type InsertPoiFeeCreditLock = z.infer<typeof insertPoiFeeCreditLockSchema>;
+export type PoiFeeCreditLock = typeof poiFeeCreditLocks.$inferSelect;
