@@ -83,11 +83,12 @@ npm start
 ```
 
 ### 修改的文件
-- `package.json` - 添加依赖
+- `package.json` - 添加依赖（@rainbow-me/rainbowkit, wagmi, viem）
 - `client/src/App.tsx` - 集成 RainbowKit Provider
 - `client/src/lib/wagmi.ts` - 新建 wagmi 配置
-- `client/src/components/WalletConnectButton.tsx` - 重构为 RainbowKit
-- `client/src/components/UniswapSwapCard.tsx` - 使用 wagmi hooks
+- `client/src/lib/ethersAdapter.ts` - 新建 viem 到 ethers.js 适配器
+- `client/src/components/WalletConnectButton.tsx` - 重构为 RainbowKit（保留 standalone 模式）
+- `client/src/components/UniswapSwapCard.tsx` - 移除 window.ethereum，使用 wagmi hooks
 - `client/src/pages/TradingApp.tsx` - 简化钱包状态管理
 
 ## 🚀 新功能
