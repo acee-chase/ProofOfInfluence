@@ -28,7 +28,7 @@ const zh = {
     title: "引领社交金融创新",
     subtitle: "打造影响力变现平台",
     description:
-      "projectX 是我们的主力产品，$POI 作为流量价值载体，帮助创作者和品牌将影响力转化为真实价值。通过一体化平台实现代币发行、社区管理和价值流通。",
+      "projectX 是 ACEE Ventures 研发的一站式影响力变现平台，$POI 作为流量价值载体，帮助创作者和品牌将影响力转化为真实价值。通过一体化平台实现代币发行、社区管理和价值流通。",
     primaryCTA: "开始使用",
     secondaryCTA: "了解更多",
   },
