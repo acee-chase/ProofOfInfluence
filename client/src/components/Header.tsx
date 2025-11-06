@@ -55,13 +55,13 @@ export default function Header({ lang = "zh" }: HeaderProps) {
         <nav className="hidden lg:flex gap-6 text-sm">
           {navItems.map((item) => (
             <Link key={item.href} href={item.href}>
-              <a
-                className={`hover:text-white transition-colors ${
+              <span
+                className={`cursor-pointer hover:text-white transition-colors ${
                   location === item.href ? "text-white font-semibold" : "text-slate-400"
                 }`}
               >
                 {item.label}
-              </a>
+              </span>
             </Link>
           ))}
         </nav>
@@ -115,8 +115,8 @@ export default function Header({ lang = "zh" }: HeaderProps) {
           <nav className="flex flex-col p-4 space-y-2">
             {navItems.map((item) => (
               <Link key={item.href} href={item.href}>
-                <a
-                  className={`block px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors ${
+                <span
+                  className={`block px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer ${
                     location === item.href
                       ? "text-white bg-slate-800 font-semibold"
                       : "text-slate-400"
@@ -124,7 +124,7 @@ export default function Header({ lang = "zh" }: HeaderProps) {
                   onClick={() => setMobileMenuOpen(false)}
                 >
                   {item.label}
-                </a>
+                </span>
               </Link>
             ))}
             {/* Wallet Connect - Mobile */}

@@ -53,30 +53,30 @@ export default function Footer({ lang = "zh" }: FooterProps) {
             <ul className="space-y-2 text-sm">
               <li>
                 <Link href={footerLinks.products.href}>
-                  <a className="text-slate-400 hover:text-white transition-colors">
+                  <span className="text-slate-400 hover:text-white transition-colors cursor-pointer">
                     {footerLinks.products.label}
-                  </a>
+                  </span>
                 </Link>
               </li>
               <li>
                 <Link href={footerLinks.creators.href}>
-                  <a className="text-slate-400 hover:text-white transition-colors">
+                  <span className="text-slate-400 hover:text-white transition-colors cursor-pointer">
                     {footerLinks.creators.label}
-                  </a>
+                  </span>
                 </Link>
               </li>
               <li>
                 <Link href={footerLinks.brands.href}>
-                  <a className="text-slate-400 hover:text-white transition-colors">
+                  <span className="text-slate-400 hover:text-white transition-colors cursor-pointer">
                     {footerLinks.brands.label}
-                  </a>
+                  </span>
                 </Link>
               </li>
               <li>
                 <Link href={footerLinks.useCases.href}>
-                  <a className="text-slate-400 hover:text-white transition-colors">
+                  <span className="text-slate-400 hover:text-white transition-colors cursor-pointer">
                     {footerLinks.useCases.label}
-                  </a>
+                  </span>
                 </Link>
               </li>
             </ul>
@@ -90,37 +90,37 @@ export default function Footer({ lang = "zh" }: FooterProps) {
             <ul className="space-y-2 text-sm">
               <li>
                 <Link href={footerLinks.whitepaper.href}>
-                  <a className="text-slate-400 hover:text-white transition-colors">
+                  <span className="text-slate-400 hover:text-white transition-colors cursor-pointer">
                     {footerLinks.whitepaper.label}
-                  </a>
+                  </span>
                 </Link>
               </li>
               <li>
                 <Link href={footerLinks.tokenomics.href}>
-                  <a className="text-slate-400 hover:text-white transition-colors">
+                  <span className="text-slate-400 hover:text-white transition-colors cursor-pointer">
                     {footerLinks.tokenomics.label}
-                  </a>
+                  </span>
                 </Link>
               </li>
               <li>
                 <Link href={footerLinks.compliance.href}>
-                  <a className="text-slate-400 hover:text-white transition-colors">
+                  <span className="text-slate-400 hover:text-white transition-colors cursor-pointer">
                     {footerLinks.compliance.label}
-                  </a>
+                  </span>
                 </Link>
               </li>
               <li>
                 <Link href={footerLinks.changelog.href}>
-                  <a className="text-slate-400 hover:text-white transition-colors">
+                  <span className="text-slate-400 hover:text-white transition-colors cursor-pointer">
                     {footerLinks.changelog.label}
-                  </a>
+                  </span>
                 </Link>
               </li>
               <li>
                 <Link href={footerLinks.company.href}>
-                  <a className="text-slate-400 hover:text-white transition-colors">
+                  <span className="text-slate-400 hover:text-white transition-colors cursor-pointer">
                     {footerLinks.company.label}
-                  </a>
+                  </span>
                 </Link>
               </li>
             </ul>
