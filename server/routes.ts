@@ -1,36 +1,21 @@
-// Backend API routes - includes Replit Auth integration from blueprint:javascript_log_in_with_replit
+// Backend API routes - includes authentication integration (Replit + Google)
 import express, { type Express, type Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated } from "./auth";
 import { insertProfileSchema, insertLinkSchema } from "@shared/schema";
 import { stripe } from "./stripe";
 
-// Extend Express Request to include user
-declare global {
-  namespace Express {
-    interface User {
-      claims?: {
-        sub: string;
-        email?: string;
-        first_name?: string;
-        last_name?: string;
-        profile_image_url?: string;
-      };
-    }
-  }
-}
-
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup Replit Auth
+  // Setup authentication providers
   await setupAuth(app);
 
   // Auth routes
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.getUser(userId);
-      
+
       // Auto-create profile on first login if it doesn't exist
       if (user) {
         const existingProfile = await storage.getProfile(userId);
@@ -63,7 +48,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Profile routes
   app.get("/api/profile", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const profile = await storage.getProfile(userId);
       
       if (!profile) {
@@ -79,7 +64,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/profile", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const validatedData = insertProfileSchema.parse({ ...req.body, userId });
       const profile = await storage.createProfile(validatedData);
       res.json(profile);
@@ -91,7 +76,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/profile", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       
       // If username is being updated, check if it's unique
       if (req.body.username) {
@@ -148,7 +133,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Link routes
   app.get("/api/links", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const links = await storage.getLinks(userId);
       res.json(links);
     } catch (error) {
@@ -159,7 +144,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/links", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const validatedData = insertLinkSchema.parse({ ...req.body, userId });
       const link = await storage.createLink(validatedData);
       res.json(link);
@@ -193,7 +178,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/links/reorder", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { linkIds } = req.body;
       await storage.reorderLinks(userId, linkIds);
       res.json({ success: true });
@@ -218,7 +203,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Web3 wallet routes
   app.post("/api/wallet/connect", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { walletAddress, signature } = req.body;
 
       // TODO: Add signature verification for production
@@ -236,7 +221,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.delete("/api/wallet/disconnect", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const user = await storage.updateUserWallet(userId, "");
       res.json(user);
     } catch (error) {
@@ -248,7 +233,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Analytics routes
   app.get("/api/analytics", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const links = await storage.getLinks(userId);
       const profile = await storage.getProfile(userId);
 
@@ -464,7 +449,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/poi/me/tier", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       // TODO: Get actual POI balance from blockchain/wallet
       // For MVP, return mock balance or from transactions
       const mockPoiBalance = 0; // Replace with actual balance lookup
@@ -480,7 +465,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // POI Fee Credit routes
   app.get("/api/poi/me/fee-credits", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const feeCredit = await storage.getFeeCredit(userId);
       
       res.json({
@@ -494,7 +479,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/poi/fee-credits/burn-intent", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { burnTxHash } = req.body;
 
       if (!burnTxHash) {
@@ -589,7 +574,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // Apply fee credits if requested
       if (applyFeeCreditsCents && applyFeeCreditsCents > 0 && req.user) {
-        const userId = req.user.claims?.sub;
+        const userId = req.user?.id;
         if (userId) {
           const feeCredit = await storage.getFeeCredit(userId);
           const availableCredits = feeCredit?.balanceCents || 0;
@@ -629,7 +614,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/checkout/lock-credits", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { orderId, amountCents } = req.body;
 
       if (!orderId || !amountCents) {
@@ -664,7 +649,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/checkout/confirm", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { orderId } = req.body;
 
       if (!orderId) {
@@ -696,7 +681,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/checkout/cancel", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user.id;
       const { orderId } = req.body;
 
       if (!orderId) {

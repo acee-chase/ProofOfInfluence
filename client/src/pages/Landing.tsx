@@ -104,7 +104,7 @@ const zh = {
 };
 
 export default function Landing() {
-  const [lang, setLang] = useState("zh");
+  const [lang, setLang] = useState<"zh" | "en">("zh");
   const t = useMemo(() => zh, [lang]);
   const { isAuthenticated } = useAuth();
 

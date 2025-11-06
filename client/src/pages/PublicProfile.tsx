@@ -280,7 +280,7 @@ export default function PublicProfile(props?: PublicProfileProps) {
           )}
 
           <div className="mt-8 w-full">
-            <UniswapSwapCard walletAddress={currentUser?.walletAddress} />
+            <UniswapSwapCard walletAddress={currentUser?.walletAddress ?? null} />
           </div>
 
           <p className="text-xs md:text-sm text-muted-foreground" data-testid="text-profile-views">

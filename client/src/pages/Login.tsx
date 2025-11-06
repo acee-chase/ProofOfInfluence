@@ -21,10 +21,8 @@ export default function Login() {
     window.location.href = "/api/login";
   };
 
-  // Placeholder handlers for future OAuth integrations
   const handleGoogleLogin = () => {
-    // TODO: Implement Google OAuth
-    console.log("Google login coming soon");
+    window.location.href = "/api/auth/google";
   };
 
   const handleAppleLogin = () => {
@@ -67,31 +65,28 @@ export default function Login() {
               使用 Replit 登录
             </Button>
 
+            <Button
+              onClick={handleGoogleLogin}
+              variant="outline"
+              className="w-full border-slate-700 py-6 text-lg font-semibold text-white hover:bg-slate-700/40"
+              size="lg"
+            >
+              <Chrome className="mr-3 h-5 w-5" />
+              使用 Google 登录
+            </Button>
+
             {/* Divider */}
             <div className="relative">
               <div className="absolute inset-0 flex items-center">
                 <div className="w-full border-t border-slate-700"></div>
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-slate-800/50 text-slate-500">
-                  更多登录方式即将推出
-                </span>
+                <span className="px-4 bg-slate-800/50 text-slate-500">更多登录方式即将推出</span>
               </div>
             </div>
 
             {/* Future OAuth Options (disabled for now) */}
             <div className="space-y-3 opacity-50">
-              <Button
-                onClick={handleGoogleLogin}
-                disabled
-                variant="outline"
-                className="w-full border-slate-700 py-6 text-slate-400"
-                size="lg"
-              >
-                <Chrome className="mr-3 h-5 w-5" />
-                使用 Google 登录
-              </Button>
-
               <Button
                 onClick={handleAppleLogin}
                 disabled

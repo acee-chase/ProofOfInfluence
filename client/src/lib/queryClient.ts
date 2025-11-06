@@ -7,6 +7,14 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+function handleUnauthorized(res: Response) {
+  if (res.status === 401 && typeof window !== "undefined") {
+    if (window.location.pathname !== "/login") {
+      window.location.href = "/login";
+    }
+  }
+}
+
 export async function apiRequest(
   method: string,
   url: string,
@@ -19,6 +27,7 @@ export async function apiRequest(
     credentials: "include",
   });
 
+  handleUnauthorized(res);
   await throwIfResNotOk(res);
   return res;
 }
@@ -35,6 +44,10 @@ export const getQueryFn: <T>(options: {
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
       return null;
+    }
+
+    if (unauthorizedBehavior === "throw") {
+      handleUnauthorized(res);
     }
 
     await throwIfResNotOk(res);
