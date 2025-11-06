@@ -1,10 +1,8 @@
-import { Switch, Route, useLocation } from "wouter";
+import { Switch, Route } from "wouter";
 import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { useAuth } from "@/hooks/useAuth";
-import { useQuery } from "@tanstack/react-query";
 import Landing from "@/pages/Landing";
 import Dashboard from "@/pages/Dashboard";
 import PublicProfile from "@/pages/PublicProfile";
@@ -25,38 +23,12 @@ import Compliance from "@/pages/Compliance";
 import Changelog from "@/pages/Changelog";
 import Company from "@/pages/Company";
 import NotFound from "@/pages/not-found";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useEffect } from "react";
-import type { User } from "@shared/schema";
 
 function Router() {
-  const { isAuthenticated, isLoading } = useAuth();
-  const [location, setLocation] = useLocation();
-
-  // Fetch user data when authenticated
-  const { data: user } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
-    enabled: isAuthenticated,
-  });
-
-  // Redirect to user's public profile after login (only on homepage)
-  useEffect(() => {
-    if (isAuthenticated && user?.username && location === "/") {
-      setLocation(`/${user.username}`);
-    }
-  }, [isAuthenticated, user, location, setLocation]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="space-y-4 w-full max-w-md px-4">
-          <Skeleton className="h-12 w-full" />
-          <Skeleton className="h-64 w-full" />
-        </div>
-      </div>
-    );
-  }
-
+  // Note: We don't block page rendering while checking auth status
+  // All public pages (Landing, Products, etc.) are immediately accessible
+  // Auth state is only used by components that need it (Header, Dashboard, etc.)
+  
   return (
     <Switch>
       {/* Home */}
