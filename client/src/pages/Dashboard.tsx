@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
+import { useLocation } from "wouter";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,28 +12,27 @@ import LinkEditor, { type LinkEditorData } from "@/components/LinkEditor";
 import AddLinkButton from "@/components/AddLinkButton";
 import AnalyticsView from "@/components/AnalyticsView";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Profile, Link, User } from "@shared/schema";
 
 export default function Dashboard() {
   const { toast } = useToast();
+  const [, setLocation] = useLocation();
+  const { user, isLoading: authLoading, isAuthenticated } = useAuth();
   const [profileForm, setProfileForm] = useState<Profile | null>(null);
   const [usernameDraft, setUsernameDraft] = useState("");
   const [linksForm, setLinksForm] = useState<LinkEditorData[]>([]);
   const [linksToDelete, setLinksToDelete] = useState<string[]>([]);
 
-  const { data: user, isLoading: userLoading } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
-  });
-
   const { data: profile, isLoading: profileLoading } = useQuery<Profile>({
     queryKey: ["/api/profile"],
-    enabled: !!user,
+    enabled: isAuthenticated,
   });
 
   const { data: links = [], isLoading: linksLoading } = useQuery<Link[]>({
     queryKey: ["/api/links"],
-    enabled: !!user,
+    enabled: isAuthenticated,
   });
 
   const { data: analytics } = useQuery<{
@@ -41,14 +41,19 @@ export default function Dashboard() {
     topLinks: Array<{ title: string; clicks: number }>;
   }>({
     queryKey: ["/api/analytics"],
-    enabled: !!user,
+    enabled: isAuthenticated,
   });
 
   useEffect(() => {
+    if (!authLoading && !isAuthenticated) {
+      setLocation("/login");
+      return;
+    }
+
     if (profile) {
       setProfileForm(profile);
     }
-  }, [profile]);
+  }, [authLoading, isAuthenticated, profile, setLocation]);
 
   useEffect(() => {
     setUsernameDraft(user?.username || "");
@@ -343,7 +348,7 @@ export default function Dashboard() {
     saveLinksMutation.mutate({ toCreate, toUpdate, toDelete });
   };
 
-  const isLoading = userLoading || profileLoading || linksLoading;
+  const isLoading = authLoading || profileLoading || linksLoading;
 
   const hasProfileChanges = useMemo(() => {
     if (!profile || !profileForm) return false;

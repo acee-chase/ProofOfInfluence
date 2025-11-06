@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Sparkles,
   Users,
@@ -16,7 +17,8 @@ import {
 } from "lucide-react";
 
 export default function ForCreators() {
-  const lang = "zh";
+  const lang: "zh" | "en" = "zh";
+  const { isAuthenticated } = useAuth();
 
   const features = [
     {

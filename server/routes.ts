@@ -2,24 +2,12 @@
 import express, { type Express, type Request } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth, isAuthenticated } from "./auth";
 import { insertProfileSchema, insertLinkSchema } from "@shared/schema";
 import { stripe } from "./stripe";
 
 // Extend Express Request to include user
-declare global {
-  namespace Express {
-    interface User {
-      claims?: {
-        sub: string;
-        email?: string;
-        first_name?: string;
-        last_name?: string;
-        profile_image_url?: string;
-      };
-    }
-  }
-}
+
 
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup Replit Auth

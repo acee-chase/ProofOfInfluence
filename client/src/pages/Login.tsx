@@ -23,8 +23,7 @@ export default function Login() {
 
   // Placeholder handlers for future OAuth integrations
   const handleGoogleLogin = () => {
-    // TODO: Implement Google OAuth
-    console.log("Google login coming soon");
+    window.location.href = "/api/login/google";
   };
 
   const handleAppleLogin = () => {
@@ -80,50 +79,51 @@ export default function Login() {
             </div>
 
             {/* Future OAuth Options (disabled for now) */}
-            <div className="space-y-3 opacity-50">
+            <div className="space-y-3">
               <Button
                 onClick={handleGoogleLogin}
-                disabled
                 variant="outline"
-                className="w-full border-slate-700 py-6 text-slate-400"
+                className="w-full border-slate-700 py-6 text-white hover:bg-slate-700"
                 size="lg"
               >
                 <Chrome className="mr-3 h-5 w-5" />
                 使用 Google 登录
               </Button>
 
-              <Button
-                onClick={handleAppleLogin}
-                disabled
-                variant="outline"
-                className="w-full border-slate-700 py-6 text-slate-400"
-                size="lg"
-              >
-                <Apple className="mr-3 h-5 w-5" />
-                使用 Apple ID 登录
-              </Button>
+              <div className="opacity-50 space-y-3">
+                <Button
+                  onClick={handleAppleLogin}
+                  disabled
+                  variant="outline"
+                  className="w-full border-slate-700 py-6 text-slate-400"
+                  size="lg"
+                >
+                  <Apple className="mr-3 h-5 w-5" />
+                  使用 Apple ID 登录
+                </Button>
 
-              <Button
-                onClick={handleWeChatLogin}
-                disabled
-                variant="outline"
-                className="w-full border-slate-700 py-6 text-slate-400"
-                size="lg"
-              >
-                <MessageCircle className="mr-3 h-5 w-5" />
-                使用微信登录
-              </Button>
+                <Button
+                  onClick={handleWeChatLogin}
+                  disabled
+                  variant="outline"
+                  className="w-full border-slate-700 py-6 text-slate-400"
+                  size="lg"
+                >
+                  <MessageCircle className="mr-3 h-5 w-5" />
+                  使用微信登录
+                </Button>
 
-              <Button
-                onClick={handleXiaohongshuLogin}
-                disabled
-                variant="outline"
-                className="w-full border-slate-700 py-6 text-slate-400"
-                size="lg"
-              >
-                <SiXiaohongshu className="mr-3 h-5 w-5" />
-                使用小红书登录
-              </Button>
+                <Button
+                  onClick={handleXiaohongshuLogin}
+                  disabled
+                  variant="outline"
+                  className="w-full border-slate-700 py-6 text-slate-400"
+                  size="lg"
+                >
+                  <SiXiaohongshu className="mr-3 h-5 w-5" />
+                  使用小红书登录
+                </Button>
+              </div>
             </div>
           </div>
 

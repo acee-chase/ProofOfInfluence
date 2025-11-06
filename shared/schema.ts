@@ -22,6 +22,8 @@ export const users = pgTable("users", {
   firstName: varchar("first_name"),
   lastName: varchar("last_name"),
   profileImageUrl: varchar("profile_image_url"),
+  authProvider: text("auth_provider").notNull().default("replit"),
+  providerId: text("provider_id").notNull().unique(),
   // Custom fields
   username: text("username").unique(),
   walletAddress: text("wallet_address").unique(),
@@ -135,6 +137,8 @@ export const upsertUserSchema = createInsertSchema(users).pick({
   firstName: true,
   lastName: true,
   profileImageUrl: true,
+  authProvider: true,
+  providerId: true,
 });
 
 export const insertProfileSchema = createInsertSchema(profiles).omit({

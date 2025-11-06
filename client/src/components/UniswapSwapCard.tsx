@@ -35,12 +35,26 @@ export default function UniswapSwapCard({ walletAddress }: UniswapSwapCardProps)
   const [priceImpact, setPriceImpact] = useState<string>("0");
   const { toast } = useToast();
 
+  type BrowserEthereum = ethers.providers.ExternalProvider & {
+  request?: (args: { method: string; params?: any[] }) => Promise<any>;
+  on?: (event: string, callback: (...args: any[]) => void) => void;
+  removeListener?: (event: string, callback: (...args: any[]) => void) => void;
+};
+
+  const getEthereum = (): BrowserEthereum | undefined => {
+    if (typeof window === "undefined") {
+      return undefined;
+    }
+    return (window as typeof window & { ethereum?: BrowserEthereum }).ethereum;
+  };
+
   // 检查网络
   const checkNetwork = async () => {
-    if (!window.ethereum) return false;
-    
+    const ethereum = getEthereum();
+    if (!ethereum) return false;
+
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const provider = new ethers.providers.Web3Provider(ethereum);
       const network = await provider.getNetwork();
       const isBase = network.chainId === BASE_CHAIN_ID;
       setIsCorrectNetwork(isBase);
@@ -53,7 +67,8 @@ export default function UniswapSwapCard({ walletAddress }: UniswapSwapCardProps)
 
   // 切换到 Base 网络
   const switchToBase = async () => {
-    if (!window.ethereum) {
+    const ethereum = getEthereum();
+    if (!ethereum || !ethereum.request) {
       toast({
         title: "请安装 MetaMask",
         variant: "destructive",
@@ -62,7 +77,7 @@ export default function UniswapSwapCard({ walletAddress }: UniswapSwapCardProps)
     }
 
     try {
-      await window.ethereum.request({
+      await ethereum.request({
         method: 'wallet_switchEthereumChain',
         params: [{ chainId: BASE_CHAIN_ID_HEX }],
       });
@@ -74,7 +89,7 @@ export default function UniswapSwapCard({ walletAddress }: UniswapSwapCardProps)
       // 网络不存在，添加它
       if (error.code === 4902) {
         try {
-          await window.ethereum.request({
+          await ethereum.request({
             method: 'wallet_addEthereumChain',
             params: [BASE_NETWORK_PARAMS]
           });
@@ -100,8 +115,9 @@ export default function UniswapSwapCard({ walletAddress }: UniswapSwapCardProps)
 
   // 查询余额
   const fetchBalances = async () => {
-    if (!walletAddress || !window.ethereum) return;
-    
+    const ethereum = getEthereum();
+    if (!walletAddress || !ethereum) return;
+
     const isBase = await checkNetwork();
     if (!isBase) {
       setEthBalance("0.0");
@@ -110,12 +126,16 @@ export default function UniswapSwapCard({ walletAddress }: UniswapSwapCardProps)
     }
 
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
-      
+      const ethereum = getEthereum();
+      if (!ethereum) {
+        throw new Error('Wallet provider not available');
+      }
+      const provider = new ethers.providers.Web3Provider(ethereum);
+
       // 查询 ETH 余额
       const ethBal = await provider.getBalance(walletAddress);
       setEthBalance(parseFloat(ethers.utils.formatEther(ethBal)).toFixed(6));
-      
+
       // 查询 USDC 余额
       const usdcContract = new ethers.Contract(
         USDC_ADDRESS,
@@ -124,7 +144,7 @@ export default function UniswapSwapCard({ walletAddress }: UniswapSwapCardProps)
       );
       const usdcBal = await usdcContract.balanceOf(walletAddress);
       setUsdcBalance(parseFloat(ethers.utils.formatUnits(usdcBal, 6)).toFixed(2));
-      
+
     } catch (error) {
       console.error("Failed to fetch balances:", error);
     }
@@ -148,7 +168,11 @@ export default function UniswapSwapCard({ walletAddress }: UniswapSwapCardProps)
     setIsLoadingQuote(true);
     
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const ethereum = getEthereum();
+      if (!ethereum) {
+        throw new Error('Wallet provider not available');
+      }
+      const provider = new ethers.providers.Web3Provider(ethereum);
       const routerContract = new ethers.Contract(
         BASESWAP_ROUTER_ADDRESS,
         UNISWAP_V2_ROUTER_ABI,
@@ -219,12 +243,20 @@ export default function UniswapSwapCard({ walletAddress }: UniswapSwapCardProps)
 
   // 监听网络切换
   useEffect(() => {
-    if (window.ethereum) {
-      window.ethereum.on('chainChanged', () => {
-        checkNetwork();
-        fetchBalances();
-      });
+    const ethereum = getEthereum();
+    if (!ethereum?.on) {
+      return;
     }
+
+    const handleChainChanged = () => {
+      checkNetwork();
+      fetchBalances();
+    };
+
+    ethereum.on('chainChanged', handleChainChanged);
+    return () => {
+      ethereum.removeListener?.('chainChanged', handleChainChanged);
+    };
   }, []);
 
   const handleSwap = async () => {
@@ -266,7 +298,11 @@ export default function UniswapSwapCard({ walletAddress }: UniswapSwapCardProps)
     setIsSwapping(true);
     
     try {
-      const provider = new ethers.providers.Web3Provider(window.ethereum);
+      const ethereum = getEthereum();
+      if (!ethereum) {
+        throw new Error('Wallet provider not available');
+      }
+      const provider = new ethers.providers.Web3Provider(ethereum);
       const signer = provider.getSigner();
       const routerContract = new ethers.Contract(
         BASESWAP_ROUTER_ADDRESS,
