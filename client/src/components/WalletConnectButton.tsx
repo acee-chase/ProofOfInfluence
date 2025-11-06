@@ -1,27 +1,9 @@
-import { useState, useEffect } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Wallet, Copy, ExternalLink, LogOut, AlertCircle } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useEffect } from "react";
+import { ConnectButton } from '@rainbow-me/rainbowkit';
+import { useAccount } from 'wagmi';
+import { useMutation } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { User } from "@shared/schema";
-
-declare global {
-  interface Window {
-    ethereum?: {
-      request: (args: { method: string; params?: any[] }) => Promise<any>;
-      on?: (event: string, callback: (...args: any[]) => void) => void;
-      removeListener?: (event: string, callback: (...args: any[]) => void) => void;
-    };
-  }
-}
 
 interface WalletConnectButtonProps {
   standalone?: boolean;
@@ -35,39 +17,28 @@ export default function WalletConnectButton({
   onDisconnect 
 }: WalletConnectButtonProps = {}) {
   const { toast } = useToast();
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [standaloneAddress, setStandaloneAddress] = useState<string | null>(null);
+  const { address, isConnected } = useAccount();
 
-  const { data: user } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
-    enabled: !standalone,
-  });
-
-  // Load standalone wallet address from localStorage
-  useEffect(() => {
-    if (standalone) {
-      const savedAddress = localStorage.getItem("wallet_address");
-      if (savedAddress) {
-        setStandaloneAddress(savedAddress);
-      }
-    }
-  }, [standalone]);
-
+  // Mutation for connecting wallet to backend (Web2 integration)
   const connectWalletMutation = useMutation({
-    mutationFn: async (data: { walletAddress: string; signature: string }) => {
-      const res = await apiRequest("POST", "/api/wallet/connect", data);
+    mutationFn: async (data: { walletAddress: string }) => {
+      // For Web2 integration mode, call backend API
+      const res = await apiRequest("POST", "/api/wallet/connect", {
+        walletAddress: data.walletAddress,
+        signature: "rainbow-kit-auto-signed" // RainbowKit handles signature internally
+      });
       return res.json();
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
-        title: "Wallet connected",
-        description: "Your wallet has been connected successfully",
+        title: "钱包已连接",
+        description: "您的钱包已成功连接到账户",
       });
     },
     onError: (error: Error) => {
       toast({
-        title: "Connection failed",
+        title: "连接失败",
         description: error.message,
         variant: "destructive",
       });
@@ -81,145 +52,140 @@ export default function WalletConnectButton({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
       toast({
-        title: "Wallet disconnected",
+        title: "钱包已断开",
       });
     },
   });
 
-  const handleConnect = async () => {
-    if (!window.ethereum) {
-      toast({
-        title: "MetaMask not found",
-        description: "Please install MetaMask to connect your wallet",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setIsConnecting(true);
-
-      const accounts = await window.ethereum.request({
-        method: "eth_requestAccounts",
-      });
-
-      const walletAddress = accounts[0];
-
+  // Handle connection changes
+  useEffect(() => {
+    if (isConnected && address) {
       if (standalone) {
-        // Standalone mode: only connect wallet, no backend call
-        localStorage.setItem("wallet_address", walletAddress);
-        setStandaloneAddress(walletAddress);
-        onConnect?.(walletAddress);
-        toast({
-          title: "钱包已连接",
-          description: truncateAddress(walletAddress),
-        });
-        setIsConnecting(false);
-        return;
-      }
-
-      // Web2 integration mode: call backend API
-      const message = `Sign this message to connect your wallet to Web3 Profile.\n\nWallet: ${walletAddress}\nTimestamp: ${Date.now()}`;
-
-      const signature = await window.ethereum.request({
-        method: "personal_sign",
-        params: [message, walletAddress],
-      });
-
-      await connectWalletMutation.mutateAsync({ walletAddress, signature });
-    } catch (error: any) {
-      if (error.code === 4001) {
-        toast({
-          title: "Connection cancelled",
-          description: "You rejected the connection request",
-        });
+        // Standalone mode: just notify parent component
+        localStorage.setItem("wallet_address", address);
+        onConnect?.(address);
       } else {
-        toast({
-          title: "Error",
-          description: error.message || "Failed to connect wallet",
-          variant: "destructive",
-        });
+        // Web2 integration mode: connect to backend
+        const savedAddress = localStorage.getItem("last_connected_wallet");
+        if (savedAddress !== address) {
+          connectWalletMutation.mutate({ walletAddress: address });
+          localStorage.setItem("last_connected_wallet", address);
+        }
       }
-    } finally {
-      setIsConnecting(false);
+    } else if (!isConnected) {
+      if (standalone) {
+        localStorage.removeItem("wallet_address");
+        onDisconnect?.();
+      } else {
+        const savedAddress = localStorage.getItem("last_connected_wallet");
+        if (savedAddress) {
+          disconnectWalletMutation.mutate();
+          localStorage.removeItem("last_connected_wallet");
+        }
+      }
     }
-  };
+  }, [isConnected, address, standalone]);
 
-  const handleDisconnect = () => {
-    if (standalone) {
-      localStorage.removeItem("wallet_address");
-      setStandaloneAddress(null);
-      onDisconnect?.();
-      toast({ title: "钱包已断开" });
-      return;
-    }
-    
-    disconnectWalletMutation.mutate();
-  };
-
-  const walletAddress = standalone ? standaloneAddress : user?.walletAddress;
-
-  const truncateAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
-  };
-
-  const copyAddress = () => {
-    if (walletAddress) {
-      navigator.clipboard.writeText(walletAddress);
-      toast({
-        title: "Address copied",
-        description: "Wallet address copied to clipboard",
-      });
-    }
-  };
-
-  if (!walletAddress) {
-    return (
-      <Button 
-        onClick={handleConnect} 
-        variant="default" 
-        disabled={isConnecting}
-        data-testid="button-connect-wallet"
-      >
-        <Wallet className="mr-2 h-4 w-4" />
-        {isConnecting ? "Connecting..." : "Connect Wallet"}
-      </Button>
-    );
-  }
-
+  // Use RainbowKit's ConnectButton with custom styling
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" className="font-mono" data-testid="button-wallet-menu">
-          <Wallet className="mr-2 h-4 w-4" />
-          {truncateAddress(walletAddress)}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuItem onClick={copyAddress} data-testid="button-copy-address">
-          <Copy className="mr-2 h-4 w-4" />
-          Copy Address
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <a
-            href={`https://etherscan.io/address/${walletAddress}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            data-testid="link-etherscan"
+    <ConnectButton.Custom>
+      {({
+        account,
+        chain,
+        openAccountModal,
+        openChainModal,
+        openConnectModal,
+        mounted,
+      }) => {
+        const ready = mounted;
+        const connected = ready && account && chain;
+
+        return (
+          <div
+            {...(!ready && {
+              'aria-hidden': true,
+              'style': {
+                opacity: 0,
+                pointerEvents: 'none',
+                userSelect: 'none',
+              },
+            })}
           >
-            <ExternalLink className="mr-2 h-4 w-4" />
-            View on Etherscan
-          </a>
-        </DropdownMenuItem>
-        <DropdownMenuItem 
-          onClick={handleDisconnect}
-          disabled={disconnectWalletMutation.isPending}
-          data-testid="button-disconnect-wallet"
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Disconnect
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+            {(() => {
+              if (!connected) {
+                return (
+                  <button
+                    onClick={openConnectModal}
+                    type="button"
+                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
+                    data-testid="button-connect-wallet"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    Connect Wallet
+                  </button>
+                );
+              }
+
+              if (chain.unsupported) {
+                return (
+                  <button
+                    onClick={openChainModal}
+                    type="button"
+                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 bg-destructive text-destructive-foreground hover:bg-destructive/90 h-10 px-4 py-2"
+                  >
+                    Wrong network
+                  </button>
+                );
+              }
+
+              return (
+                <div className="flex gap-2">
+                  <button
+                    onClick={openChainModal}
+                    type="button"
+                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-3"
+                  >
+                    {chain.hasIcon && (
+                      <div
+                        style={{
+                          background: chain.iconBackground,
+                          width: 16,
+                          height: 16,
+                          borderRadius: 999,
+                          overflow: 'hidden',
+                        }}
+                      >
+                        {chain.iconUrl && (
+                          <img
+                            alt={chain.name ?? 'Chain icon'}
+                            src={chain.iconUrl}
+                            style={{ width: 16, height: 16 }}
+                          />
+                        )}
+                      </div>
+                    )}
+                    {chain.name}
+                  </button>
+
+                  <button
+                    onClick={openAccountModal}
+                    type="button"
+                    className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 px-3 font-mono"
+                    data-testid="button-wallet-menu"
+                  >
+                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    {account.displayName}
+                  </button>
+                </div>
+              );
+            })()}
+          </div>
+        );
+      }}
+    </ConnectButton.Custom>
   );
 }
