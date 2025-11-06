@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Coins,
   TrendingUp,
@@ -17,6 +18,7 @@ import {
 
 export default function Products() {
   const lang = "zh";
+  const { isAuthenticated } = useAuth();
 
   const products = [
     {
@@ -30,7 +32,7 @@ export default function Products() {
         "多链支持（Ethereum, Base, Arbitrum）",
       ],
       cta: "开始发行",
-      href: "/dashboard",
+      href: "/app",
     },
     {
       icon: TrendingUp,
@@ -43,7 +45,7 @@ export default function Products() {
         "实时收益追踪",
       ],
       cta: "了解更多",
-      href: "/dashboard",
+      href: "/app",
     },
     {
       icon: Image,
@@ -56,7 +58,7 @@ export default function Products() {
         "元数据托管服务",
       ],
       cta: "创建 NFT",
-      href: "/dashboard",
+      href: "/app",
     },
     {
       icon: Vote,
@@ -69,7 +71,7 @@ export default function Products() {
         "提案自动执行",
       ],
       cta: "启用治理",
-      href: "/dashboard",
+      href: "/app",
     },
     {
       icon: Wallet,
@@ -82,7 +84,7 @@ export default function Products() {
         "安全交易签名",
       ],
       cta: "连接钱包",
-      href: "/dashboard",
+      href: "/app",
     },
     {
       icon: BarChart3,
@@ -95,7 +97,7 @@ export default function Products() {
         "数据报告导出",
       ],
       cta: "查看分析",
-      href: "/dashboard",
+      href: "/app",
     },
   ];
 
@@ -124,7 +126,7 @@ export default function Products() {
           </h1>
           <p className="text-lg text-slate-400 leading-relaxed">
             我们的产品涵盖代币发行、质押挖矿、NFT 交易和治理系统等，满足不同 Web3 场景需求。
-            通过 Dashboard 一站式访问所有功能，使用便捷。
+            通过 projectX 一站式访问所有功能，使用便捷。
           </p>
         </div>
       </section>
@@ -230,12 +232,12 @@ export default function Products() {
             <p className="text-lg text-slate-300">
               连接您的钱包，立即访问所有产品功能
             </p>
-            <Link href="/dashboard">
+            <Link href={isAuthenticated ? "/app" : "/login"}>
               <Button
                 size="lg"
-                className="bg-white text-slate-900 hover:bg-slate-100 px-8"
+                className="bg-white text-slate-900 hover:bg-slate-100 px-8 text-xl py-6"
               >
-                进入控制面板
+                进入 projectX
               </Button>
             </Link>
           </div>

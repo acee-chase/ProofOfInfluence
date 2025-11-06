@@ -4,6 +4,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import Landing from "@/pages/Landing";
+import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import PublicProfile from "@/pages/PublicProfile";
 import PaymentSuccess from "@/pages/PaymentSuccess";
@@ -34,6 +35,9 @@ function Router() {
       {/* Home */}
       <Route path="/" component={Landing} />
       
+      {/* Auth */}
+      <Route path="/login" component={Login} />
+      
       {/* Information Architecture Routes */}
       <Route path="/products" component={Products} />
       <Route path="/for-creators" component={ForCreators} />
@@ -50,12 +54,17 @@ function Router() {
       <Route path="/tokenomics" component={Tokenomics} />
       <Route path="/roadmap" component={Roadmap} />
       
-      {/* App & Dashboard */}
-      <Route path="/app" component={TradingApp} />
+      {/* App & Dashboard - New Structure */}
+      <Route path="/app" component={Dashboard} />
+      <Route path="/app/settings" component={Profile} />
+      <Route path="/app/recharge" component={Recharge} />
+      <Route path="/payment-success" component={PaymentSuccess} />
+      
+      {/* Legacy App Routes (redirect for backwards compatibility) */}
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/profile" component={Profile} />
       <Route path="/recharge" component={Recharge} />
-      <Route path="/payment-success" component={PaymentSuccess} />
+      <Route path="/trading" component={TradingApp} />
       
       {/* Dynamic User Profiles */}
       <Route path="/:username" component={PublicProfile} />

@@ -3,6 +3,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Building2,
   Users,
@@ -18,6 +19,7 @@ import {
 
 export default function ForBrands() {
   const lang = "zh";
+  const { isAuthenticated } = useAuth();
 
   const features = [
     {
@@ -134,10 +136,10 @@ export default function ForBrands() {
             从代币经济设计到合规部署，全程专业支持。
           </p>
           <div className="flex flex-wrap justify-center gap-4 pt-4">
-            <Link href="/dashboard">
+            <Link href={isAuthenticated ? "/app" : "/login"}>
               <Button
                 size="lg"
-                className="bg-white text-slate-900 hover:bg-slate-100 px-8"
+                className="bg-white text-slate-900 hover:bg-slate-100 px-8 text-xl py-6"
               >
                 咨询方案
               </Button>
@@ -146,7 +148,7 @@ export default function ForBrands() {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-slate-700 hover:bg-slate-800 px-8"
+                className="border-slate-700 hover:bg-slate-800 px-8 text-xl py-6"
               >
                 查看案例
               </Button>

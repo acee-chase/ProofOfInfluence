@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import POITokenPrice from "@/components/POITokenPrice";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Rocket,
   Layers,
@@ -23,10 +25,10 @@ import {
 const zh = {
   brand: "ACEE Ventures",
   hero: {
-    title: "欢迎来到 ACEE Ventures",
-    subtitle: "您的一站式 Web3 产品发行平台",
+    title: "引领社交金融创新",
+    subtitle: "打造影响力变现平台",
     description:
-      "我们帮助品牌方、开发者和创作者轻松进入加密世界，通过一体化仪表盘提供代币发行、质押挖矿、NFT服务和治理平台。",
+      "projectX 是我们的主力产品，$POI 作为流量价值载体，帮助创作者和品牌将影响力转化为真实价值。通过一体化平台实现代币发行、社区管理和价值流通。",
     primaryCTA: "开始使用",
     secondaryCTA: "了解更多",
   },
@@ -96,14 +98,15 @@ const zh = {
   },
   cta: {
     title: "准备好开始了吗？",
-    description: "立即连接钱包，访问您的专属仪表盘",
-    button: "进入控制面板",
+    description: "立即连接钱包，访问您的专属 projectX",
+    button: "进入 projectX",
   },
 };
 
 export default function Landing() {
   const [lang, setLang] = useState("zh");
   const t = useMemo(() => zh, [lang]);
+  const { isAuthenticated } = useAuth();
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100">
@@ -118,14 +121,20 @@ export default function Landing() {
           <p className="text-2xl md:text-3xl text-slate-300 font-semibold">
             {t.hero.subtitle}
           </p>
+          
+          {/* POI Token Price Display */}
+          <div className="py-6">
+            <POITokenPrice />
+          </div>
+          
           <p className="text-lg text-slate-400 leading-relaxed max-w-3xl mx-auto">
             {t.hero.description}
           </p>
           <div className="flex flex-wrap justify-center gap-4 pt-4">
-            <Link href="/dashboard">
+            <Link href={isAuthenticated ? "/app" : "/login"}>
               <Button
                 size="lg"
-                className="bg-white text-slate-900 hover:bg-slate-100 px-8"
+                className="bg-white text-slate-900 hover:bg-slate-100 px-8 text-xl py-6"
               >
                 {t.hero.primaryCTA}
               </Button>
@@ -134,7 +143,7 @@ export default function Landing() {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-slate-700 hover:bg-slate-800 px-8"
+                className="border-slate-700 hover:bg-slate-800 px-8 text-xl py-6"
               >
                 {t.hero.secondaryCTA}
               </Button>
@@ -217,10 +226,10 @@ export default function Landing() {
             <p className="text-lg text-slate-300">
               {t.cta.description}
             </p>
-            <Link href="/dashboard">
+            <Link href={isAuthenticated ? "/app" : "/login"}>
               <Button
                 size="lg"
-                className="bg-white text-slate-900 hover:bg-slate-100 px-8"
+                className="bg-white text-slate-900 hover:bg-slate-100 px-8 text-xl py-6"
               >
                 {t.cta.button}
               </Button>

@@ -3,6 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Link } from "wouter";
 import Header from "@/components/Header";
 import Footer from "@/components/Footer";
+import { useAuth } from "@/hooks/useAuth";
 import {
   Building2,
   Palette,
@@ -17,6 +18,7 @@ import {
 
 export default function UseCases() {
   const lang = "zh";
+  const { isAuthenticated } = useAuth();
 
   const cases = [
     {
@@ -270,10 +272,10 @@ export default function UseCases() {
               联系我们的团队，探讨您的业务如何通过代币化创造新价值
             </p>
             <div className="flex flex-wrap justify-center gap-4">
-              <Link href="/dashboard">
+              <Link href={isAuthenticated ? "/app" : "/login"}>
                 <Button
                   size="lg"
-                  className="bg-white text-slate-900 hover:bg-slate-100 px-8"
+                  className="bg-white text-slate-900 hover:bg-slate-100 px-8 text-xl py-6"
                 >
                   开始咨询
                 </Button>
@@ -282,7 +284,7 @@ export default function UseCases() {
                 <Button
                   size="lg"
                   variant="outline"
-                  className="border-slate-500 hover:bg-slate-800 px-8 text-white"
+                  className="border-slate-500 hover:bg-slate-800 px-8 text-xl py-6 text-white"
                 >
                   了解品牌方案
                   <ArrowRight className="w-4 h-4 ml-2" />

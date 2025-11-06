@@ -112,10 +112,10 @@ export default function ForCreators() {
             无需技术背景，开启您的创作者经济新时代。
           </p>
           <div className="flex flex-wrap justify-center gap-4 pt-4">
-            <Link href="/dashboard">
+            <Link href={isAuthenticated ? "/app" : "/login"}>
               <Button
                 size="lg"
-                className="bg-white text-slate-900 hover:bg-slate-100 px-8"
+                className="bg-white text-slate-900 hover:bg-slate-100 px-8 text-xl py-6"
               >
                 免费开始
               </Button>
@@ -124,7 +124,7 @@ export default function ForCreators() {
               <Button
                 size="lg"
                 variant="outline"
-                className="border-slate-700 hover:bg-slate-800 px-8"
+                className="border-slate-700 hover:bg-slate-800 px-8 text-xl py-6"
               >
                 查看案例
               </Button>

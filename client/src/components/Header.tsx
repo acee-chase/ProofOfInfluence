@@ -38,7 +38,7 @@ export default function Header({ lang = "zh" }: HeaderProps) {
         { label: "Company", href: "/company" },
       ];
 
-  const dashboardLabel = lang === "zh" ? "控制面板" : "Dashboard";
+  const projectXLabel = lang === "zh" ? "projectX" : "projectX";
   const loginLabel = lang === "zh" ? "登录" : "Login";
 
   return (
@@ -73,18 +73,18 @@ export default function Header({ lang = "zh" }: HeaderProps) {
             <WalletConnectButton />
           </div>
 
-          {/* Dashboard Link */}
+          {/* projectX / Login Link */}
           {isAuthenticated ? (
-            <Link href="/dashboard">
+            <Link href="/app">
               <Button
                 variant="default"
                 className="bg-white text-slate-900 hover:bg-slate-100"
               >
-                {dashboardLabel}
+                {projectXLabel}
               </Button>
             </Link>
           ) : (
-            <Link href="/dashboard">
+            <Link href="/login">
               <Button
                 variant="outline"
                 className="border-slate-700 hover:bg-slate-800"
