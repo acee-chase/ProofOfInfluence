@@ -119,7 +119,7 @@ export default function WalletConnectButton({
       }
 
       // Web2 integration mode: call backend API
-      const message = `Sign this message to connect your wallet to LinkTree Web3.\n\nWallet: ${walletAddress}\nTimestamp: ${Date.now()}`;
+      const message = `Sign this message to connect your wallet to Web3 Profile.\n\nWallet: ${walletAddress}\nTimestamp: ${Date.now()}`;
 
       const signature = await window.ethereum.request({
         method: "personal_sign",

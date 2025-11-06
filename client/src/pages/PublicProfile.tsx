@@ -312,7 +312,7 @@ export default function PublicProfile(props?: PublicProfileProps) {
 
         <footer className="mt-16 py-8 text-center">
           <p className="text-sm text-muted-foreground">
-            Powered by LinkTree Web3
+            Powered by Web3 Profile
           </p>
         </footer>
       </div>

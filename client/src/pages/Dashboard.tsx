@@ -393,7 +393,7 @@ export default function Dashboard() {
     <div className="min-h-screen bg-background">
       <header className="border-b sticky top-0 bg-background/95 backdrop-blur z-10">
         <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <h1 className="text-xl font-bold">LinkTree Web3</h1>
+          <h1 className="text-xl font-bold">Web3 Profile</h1>
           <div className="flex items-center gap-2">
             <Button
               variant="outline"
