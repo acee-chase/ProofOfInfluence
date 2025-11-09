@@ -4,7 +4,7 @@ import type { RouteComponentProps } from "wouter";
 import ProfileAvatar from "@/components/ProfileAvatar";
 import ThemeToggle from "@/components/ThemeToggle";
 import WalletConnectButton from "@/components/WalletConnectButton";
-import { Copy, ExternalLink, Edit, ShoppingCart } from "lucide-react";
+import { Copy, ExternalLink, Edit, ShoppingCart, Coins } from "lucide-react";
 import { SiGoogle, SiX, SiSinaweibo, SiTiktok } from "react-icons/si";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
