@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, timestamp, integer, boolean, jsonb, index, bigint, numeric, serial } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, timestamp, integer, boolean, jsonb, index, bigint, numeric, serial, uniqueIndex } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
 
@@ -121,6 +121,49 @@ export const poiFeeCreditLocks = pgTable("poi_fee_credit_locks", {
 });
 
 
+// Market tables
+export const marketOrders = pgTable(
+  "market_orders",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+    side: varchar("side", { length: 4 }).notNull(),
+    tokenIn: varchar("token_in", { length: 50 }).notNull(),
+    tokenOut: varchar("token_out", { length: 50 }).notNull(),
+    amountIn: numeric("amount_in", { precision: 20, scale: 8 }).notNull(),
+    amountOut: numeric("amount_out", { precision: 20, scale: 8 }),
+    quotedAmountOut: numeric("quoted_amount_out", { precision: 20, scale: 8 }),
+    feeBps: integer("fee_bps").notNull().default(0),
+    status: varchar("status", { length: 20 }).notNull().default("PENDING"),
+    txRef: varchar("tx_ref", { length: 255 }),
+    route: jsonb("route"),
+    idempotencyKey: varchar("idempotency_key", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("idx_market_orders_user_id").on(table.userId),
+    index("idx_market_orders_status").on(table.status),
+    index("idx_market_orders_created_at").on(table.createdAt),
+    uniqueIndex("uniq_market_orders_idempotency").on(table.userId, table.idempotencyKey),
+  ],
+);
+
+export const marketTrades = pgTable(
+  "market_trades",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    orderId: varchar("order_id").notNull().references(() => marketOrders.id, { onDelete: "cascade" }),
+    price: numeric("price", { precision: 20, scale: 8 }).notNull(),
+    amount: numeric("amount", { precision: 20, scale: 8 }).notNull(),
+    route: varchar("route", { length: 50 }),
+    txRef: varchar("tx_ref", { length: 255 }),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [index("idx_market_trades_order_id").on(table.orderId)],
+);
+
+
 // Insert schemas
 export const insertUserSchema = createInsertSchema(users).omit({
   id: true,
@@ -178,6 +221,18 @@ export const insertPoiFeeCreditLockSchema = createInsertSchema(poiFeeCreditLocks
   updatedAt: true,
 });
 
+export const insertMarketOrderSchema = createInsertSchema(marketOrders).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  amountOut: true,
+});
+
+export const insertMarketTradeSchema = createInsertSchema(marketTrades).omit({
+  id: true,
+  createdAt: true,
+});
+
 
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
@@ -204,3 +259,9 @@ export type PoiBurnIntent = typeof poiBurnIntents.$inferSelect;
 
 export type InsertPoiFeeCreditLock = z.infer<typeof insertPoiFeeCreditLockSchema>;
 export type PoiFeeCreditLock = typeof poiFeeCreditLocks.$inferSelect;
+
+export type InsertMarketOrder = z.infer<typeof insertMarketOrderSchema>;
+export type MarketOrder = typeof marketOrders.$inferSelect;
+
+export type InsertMarketTrade = z.infer<typeof insertMarketTradeSchema>;
+export type MarketTrade = typeof marketTrades.$inferSelect;

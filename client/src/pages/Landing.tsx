@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from "react";
+import React from "react";
 import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -136,8 +136,8 @@ const zh = {
 };
 
 export default function Landing() {
-  const [lang, setLang] = useState("zh");
-  const t = useMemo(() => zh, [lang]);
+  const lang: "zh" | "en" = "zh";
+  const t = zh;
   const { isAuthenticated } = useAuth();
 
   return (
@@ -231,15 +231,16 @@ export default function Landing() {
         <div className="grid md:grid-cols-3 gap-8 mt-12">
           {t.projectX.modules.map((module, index) => {
             const Icon = module.icon;
-            const colorClasses = {
+            const colorClasses: Record<"blue" | "green" | "purple", string> = {
               blue: "from-blue-900/50 to-blue-800/30 border-blue-700/50",
               green: "from-green-900/50 to-green-800/30 border-green-700/50",
               purple: "from-purple-900/50 to-purple-800/30 border-purple-700/50",
             };
+            const colorKey = module.color as keyof typeof colorClasses;
             return (
               <Card
                 key={index}
-                className={`p-8 bg-gradient-to-br ${colorClasses[module.color]} hover:scale-105 transition-all duration-300`}
+                className={`p-8 bg-gradient-to-br ${colorClasses[colorKey]} hover:scale-105 transition-all duration-300`}
               >
                 <div className="space-y-6">
                   <div className="w-16 h-16 rounded-2xl bg-slate-700/50 flex items-center justify-center">

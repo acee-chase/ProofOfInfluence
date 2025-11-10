@@ -8,6 +8,8 @@ import {
   poiFeeCredits,
   poiBurnIntents,
   poiFeeCreditLocks,
+  marketOrders,
+  marketTrades,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -25,9 +27,13 @@ import {
   type InsertPoiBurnIntent,
   type PoiFeeCreditLock,
   type InsertPoiFeeCreditLock,
+  type MarketOrder,
+  type InsertMarketOrder,
+  type MarketTrade,
+  type InsertMarketTrade,
 } from "@shared/schema";
 import { db } from "./db";
-import { eq, and, desc, sql, gte } from "drizzle-orm";
+import { eq, and, desc, sql, gte, or } from "drizzle-orm";
 
 export interface IStorage {
   // User operations (required for Replit Auth)
@@ -81,6 +87,32 @@ export interface IStorage {
   getFeeCreditLock(orderId: string): Promise<PoiFeeCreditLock | undefined>;
   updateFeeCreditLockStatus(lockId: string, status: string): Promise<PoiFeeCreditLock>;
   releaseFeeCreditLock(orderId: string): Promise<void>;
+
+  // Market operations
+  createMarketOrder(order: InsertMarketOrder): Promise<MarketOrder>;
+  getMarketOrderById(orderId: string): Promise<MarketOrder | undefined>;
+  getMarketOrderForUser(orderId: string, userId: string): Promise<MarketOrder | undefined>;
+  getMarketOrderByIdempotency(userId: string, idempotencyKey: string): Promise<MarketOrder | undefined>;
+  updateMarketOrder(orderId: string, updates: Partial<InsertMarketOrder>): Promise<MarketOrder>;
+  listMarketOrders(params: {
+    userId: string;
+    status?: string;
+    limit: number;
+    offset: number;
+  }): Promise<{ orders: MarketOrder[]; total: number }>;
+  createMarketTrade(trade: InsertMarketTrade): Promise<MarketTrade>;
+  getMarketTradesForOrder(orderId: string): Promise<MarketTrade[]>;
+  getRecentMarketTrades(params: {
+    tokenIn: string;
+    tokenOut: string;
+    limit: number;
+  }): Promise<Array<{ trade: MarketTrade; order: MarketOrder }>>;
+  getMarketTradesSince(params: {
+    tokenIn: string;
+    tokenOut: string;
+    since: Date;
+  }): Promise<Array<{ trade: MarketTrade; order: MarketOrder }>>;
+  getPendingMarketOrdersForPair(params: { tokenIn: string; tokenOut: string }): Promise<MarketOrder[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -360,6 +392,139 @@ export class DatabaseStorage implements IStorage {
       .update(poiFeeCreditLocks)
       .set({ status: 'released', updatedAt: new Date() })
       .where(eq(poiFeeCreditLocks.orderId, orderId));
+  }
+
+  // Market operations
+  async createMarketOrder(order: InsertMarketOrder): Promise<MarketOrder> {
+    const [created] = await db.insert(marketOrders).values(order).returning();
+    return created;
+  }
+
+  async getMarketOrderById(orderId: string): Promise<MarketOrder | undefined> {
+    const [order] = await db.select().from(marketOrders).where(eq(marketOrders.id, orderId));
+    return order;
+  }
+
+  async getMarketOrderForUser(orderId: string, userId: string): Promise<MarketOrder | undefined> {
+    const [order] = await db
+      .select()
+      .from(marketOrders)
+      .where(and(eq(marketOrders.id, orderId), eq(marketOrders.userId, userId)));
+    return order;
+  }
+
+  async getMarketOrderByIdempotency(userId: string, idempotencyKey: string): Promise<MarketOrder | undefined> {
+    if (!idempotencyKey) {
+      return undefined;
+    }
+
+    const [order] = await db
+      .select()
+      .from(marketOrders)
+      .where(and(eq(marketOrders.userId, userId), eq(marketOrders.idempotencyKey, idempotencyKey)));
+    return order;
+  }
+
+  async updateMarketOrder(orderId: string, updates: Partial<InsertMarketOrder>): Promise<MarketOrder> {
+    const [order] = await db
+      .update(marketOrders)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(marketOrders.id, orderId))
+      .returning();
+    return order;
+  }
+
+  async listMarketOrders(params: {
+    userId: string;
+    status?: string;
+    limit: number;
+    offset: number;
+  }): Promise<{ orders: MarketOrder[]; total: number }> {
+    const { userId, status, limit, offset } = params;
+    const whereClause = status
+      ? and(eq(marketOrders.userId, userId), eq(marketOrders.status, status))
+      : eq(marketOrders.userId, userId);
+
+    const orders = await db
+      .select()
+      .from(marketOrders)
+      .where(whereClause)
+      .orderBy(desc(marketOrders.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    const [{ value: total }] = await db
+      .select({ value: sql<number>`count(*)` })
+      .from(marketOrders)
+      .where(whereClause);
+
+    return { orders, total: Number(total ?? 0) };
+  }
+
+  async createMarketTrade(trade: InsertMarketTrade): Promise<MarketTrade> {
+    const [created] = await db.insert(marketTrades).values(trade).returning();
+    return created;
+  }
+
+  async getMarketTradesForOrder(orderId: string): Promise<MarketTrade[]> {
+    return await db
+      .select()
+      .from(marketTrades)
+      .where(eq(marketTrades.orderId, orderId))
+      .orderBy(desc(marketTrades.createdAt));
+  }
+
+  async getRecentMarketTrades(params: {
+    tokenIn: string;
+    tokenOut: string;
+    limit: number;
+  }): Promise<Array<{ trade: MarketTrade; order: MarketOrder }>> {
+    const { tokenIn, tokenOut, limit } = params;
+    const pairClause = or(
+      and(eq(marketOrders.tokenIn, tokenIn), eq(marketOrders.tokenOut, tokenOut)),
+      and(eq(marketOrders.tokenIn, tokenOut), eq(marketOrders.tokenOut, tokenIn)),
+    );
+
+    return await db
+      .select({ trade: marketTrades, order: marketOrders })
+      .from(marketTrades)
+      .innerJoin(marketOrders, eq(marketTrades.orderId, marketOrders.id))
+      .where(pairClause)
+      .orderBy(desc(marketTrades.createdAt))
+      .limit(limit);
+  }
+
+  async getMarketTradesSince(params: {
+    tokenIn: string;
+    tokenOut: string;
+    since: Date;
+  }): Promise<Array<{ trade: MarketTrade; order: MarketOrder }>> {
+    const { tokenIn, tokenOut, since } = params;
+    const pairClause = or(
+      and(eq(marketOrders.tokenIn, tokenIn), eq(marketOrders.tokenOut, tokenOut)),
+      and(eq(marketOrders.tokenIn, tokenOut), eq(marketOrders.tokenOut, tokenIn)),
+    );
+
+    return await db
+      .select({ trade: marketTrades, order: marketOrders })
+      .from(marketTrades)
+      .innerJoin(marketOrders, eq(marketTrades.orderId, marketOrders.id))
+      .where(and(pairClause, gte(marketTrades.createdAt, since)))
+      .orderBy(desc(marketTrades.createdAt));
+  }
+
+  async getPendingMarketOrdersForPair(params: { tokenIn: string; tokenOut: string }): Promise<MarketOrder[]> {
+    const { tokenIn, tokenOut } = params;
+    const pairClause = or(
+      and(eq(marketOrders.tokenIn, tokenIn), eq(marketOrders.tokenOut, tokenOut)),
+      and(eq(marketOrders.tokenIn, tokenOut), eq(marketOrders.tokenOut, tokenIn)),
+    );
+
+    return await db
+      .select()
+      .from(marketOrders)
+      .where(and(pairClause, eq(marketOrders.status, 'PENDING')))
+      .orderBy(desc(marketOrders.createdAt));
   }
 }
 

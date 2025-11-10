@@ -49,7 +49,7 @@ export default function ReservePoolPanel() {
   // });
 
   // Placeholder data for UI demonstration
-  const poolData: ReservePoolData | undefined = undefined;
+  const poolData = null as ReservePoolData | null;
   const isLoading = false;
 
   // Placeholder chart data

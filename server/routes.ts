@@ -5,6 +5,7 @@ import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertProfileSchema, insertLinkSchema } from "@shared/schema";
 import { stripe } from "./stripe";
+import { registerMarketRoutes } from "./routes/market";
 
 // Extend Express Request to include user
 declare global {
@@ -24,6 +25,8 @@ declare global {
 export async function registerRoutes(app: Express): Promise<Server> {
   // Setup Replit Auth
   await setupAuth(app);
+
+  registerMarketRoutes(app);
 
   // Auth routes
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
