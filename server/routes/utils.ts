@@ -33,6 +33,16 @@ export function getRequestRole(req: Request): string | undefined {
 }
 
 export function hasRequiredRole(req: Request, allowedRoles: string[]): boolean {
+  // DEV MODE: Grant access to all authenticated users if enabled
+  // IMPORTANT: Only works when NODE_ENV is explicitly 'development' for security
+  const isDevelopment = process.env.NODE_ENV === 'development';
+  const devModeAdmin = process.env.DEV_MODE_ADMIN === 'true';
+  
+  if (isDevelopment && devModeAdmin && (req as any).isAuthenticated?.()) {
+    return true; // Skip permission check in dev mode
+  }
+  
+  // Normal role checking logic
   const role = getRequestRole(req);
   if (!role) {
     return false;
