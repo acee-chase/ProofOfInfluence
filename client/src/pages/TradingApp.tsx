@@ -1,4 +1,3 @@
-import { useState, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import ThemeToggle from "@/components/ThemeToggle";
@@ -9,19 +8,6 @@ import { Link } from "wouter";
 import { ArrowLeft } from "lucide-react";
 
 export default function TradingApp() {
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-
-  useEffect(() => {
-    // 检查钱包连接状态
-    if (window.ethereum) {
-      window.ethereum.request({ method: "eth_accounts" }).then((accounts: string[]) => {
-        if (accounts.length > 0) {
-          setWalletAddress(accounts[0]);
-        }
-      });
-    }
-  }, []);
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900">
       {/* Header */}
@@ -37,7 +23,7 @@ export default function TradingApp() {
             <h1 className="text-xl font-bold text-white">AI 交易员</h1>
           </div>
           <div className="flex items-center gap-2">
-            <WalletConnectButton standalone onConnect={setWalletAddress} onDisconnect={() => setWalletAddress(null)} />
+            <WalletConnectButton standalone />
             <ThemeToggle />
           </div>
         </div>
@@ -76,17 +62,22 @@ export default function TradingApp() {
 
           {/* Right: Swap Interface (占 1/3) */}
           <div className="space-y-6">
-            <UniswapSwapCard walletAddress={walletAddress} />
+            <UniswapSwapCard />
             
             {/* Quick Guide */}
             <Card className="p-4 bg-slate-800/30 border-slate-700">
               <h4 className="text-sm font-semibold text-white mb-2">使用指南</h4>
               <ol className="text-xs text-slate-400 space-y-2">
                 <li>1. 点击"连接钱包"按钮</li>
-                <li>2. 在 MetaMask 中确认连接</li>
+                <li>2. 选择您的钱包（MetaMask/Trust Wallet/扫码连接）</li>
                 <li>3. 输入交易金额</li>
                 <li>4. 点击"兑换"并确认交易</li>
               </ol>
+              <div className="mt-3 pt-3 border-t border-slate-700">
+                <p className="text-xs text-slate-500">
+                  💡 移动端用户可以通过 WalletConnect 扫码连接钱包
+                </p>
+              </div>
             </Card>
           </div>
         </div>
@@ -94,4 +85,3 @@ export default function TradingApp() {
     </div>
   );
 }
-

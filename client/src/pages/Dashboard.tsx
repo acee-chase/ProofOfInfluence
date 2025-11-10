@@ -10,6 +10,8 @@ import ProfileEditor from "@/components/ProfileEditor";
 import LinkEditor, { type LinkEditorData } from "@/components/LinkEditor";
 import AddLinkButton from "@/components/AddLinkButton";
 import AnalyticsView from "@/components/AnalyticsView";
+import ReservePoolPanel from "@/components/ReservePoolPanel";
+import MerchantDashboard from "@/components/MerchantDashboard";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Profile, Link, User } from "@shared/schema";
@@ -429,6 +431,12 @@ export default function Dashboard() {
             <TabsTrigger value="analytics" data-testid="tab-analytics">
               Analytics
             </TabsTrigger>
+            <TabsTrigger value="reserve-pool" data-testid="tab-reserve-pool">
+              Reserve Pool
+            </TabsTrigger>
+            <TabsTrigger value="merchant" data-testid="tab-merchant">
+              Merchant
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="profile">
@@ -481,6 +489,14 @@ export default function Dashboard() {
                 />
               )}
             </div>
+          </TabsContent>
+
+          <TabsContent value="reserve-pool">
+            <ReservePoolPanel />
+          </TabsContent>
+
+          <TabsContent value="merchant">
+            <MerchantDashboard />
           </TabsContent>
         </Tabs>
       </div>

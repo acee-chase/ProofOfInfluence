@@ -25,6 +25,7 @@ export const users = pgTable("users", {
   // Custom fields
   username: text("username").unique(),
   walletAddress: text("wallet_address").unique(),
+  role: varchar("role", { length: 20 }).default("user").notNull(), // user, admin
   // Metadata
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),

@@ -3,6 +3,8 @@ import { queryClient } from "./lib/queryClient";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { WagmiProvider } from 'wagmi';
+import { config } from './lib/wagmi';
 import Landing from "@/pages/Landing";
 import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
@@ -23,6 +25,7 @@ import TokenDocs from "@/pages/TokenDocs";
 import Compliance from "@/pages/Compliance";
 import Changelog from "@/pages/Changelog";
 import Company from "@/pages/Company";
+import Market from "@/pages/Market";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -58,6 +61,7 @@ function Router() {
       <Route path="/app" component={Dashboard} />
       <Route path="/app/settings" component={Profile} />
       <Route path="/app/recharge" component={Recharge} />
+      <Route path="/app/market" component={Market} />
       <Route path="/payment-success" component={PaymentSuccess} />
       
       {/* Legacy App Routes (redirect for backwards compatibility) */}
@@ -77,12 +81,14 @@ function Router() {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Router />
-      </TooltipProvider>
-    </QueryClientProvider>
+    <WagmiProvider config={config}>
+      <QueryClientProvider client={queryClient}>
+        <TooltipProvider>
+          <Toaster />
+          <Router />
+        </TooltipProvider>
+      </QueryClientProvider>
+    </WagmiProvider>
   );
 }
 
