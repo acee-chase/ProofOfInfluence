@@ -7,6 +7,7 @@ import type {
   MarketApiInterface,
   MarketOrder,
   CreateOrderRequest,
+  CreateOrderResponse,
   MarketOrdersResponse,
   Orderbook,
   MarketStats,
@@ -122,8 +123,12 @@ const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 // Mock API implementation
 export const mockMarketApi: MarketApiInterface = {
-  async createOrder(data: CreateOrderRequest): Promise<MarketOrder> {
+  async createOrder(data: CreateOrderRequest): Promise<CreateOrderResponse> {
     await delay(500); // Simulate network delay
+
+    const feeBps = 30; // Default 0.3%
+    const rate = data.side === 'buy' ? 1.02 : 0.99;
+    const estimatedAmountOut = (parseFloat(data.amountIn) * rate).toFixed(8);
 
     const newOrder: MarketOrder = {
       id: `${Date.now()}`,
@@ -131,7 +136,8 @@ export const mockMarketApi: MarketApiInterface = {
       tokenIn: data.tokenIn,
       tokenOut: data.tokenOut,
       amountIn: data.amountIn,
-      feeBps: 30, // Default 0.3%
+      quotedAmountOut: estimatedAmountOut,
+      feeBps,
       status: 'PENDING',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
@@ -143,8 +149,7 @@ export const mockMarketApi: MarketApiInterface = {
     setTimeout(() => {
       const order = mockOrders.find(o => o.id === newOrder.id);
       if (order && order.status === 'PENDING') {
-        const rate = data.side === 'buy' ? 1.02 : 0.99;
-        order.amountOut = (parseFloat(data.amountIn) * rate).toFixed(2);
+        order.amountOut = order.quotedAmountOut;
         order.status = 'FILLED';
         order.txRef = `0x${Math.random().toString(16).substr(2, 8)}...${Math.random().toString(16).substr(2, 4)}`;
         order.route = {
@@ -155,7 +160,18 @@ export const mockMarketApi: MarketApiInterface = {
       }
     }, 3000);
 
-    return newOrder;
+    // Return response matching Codex backend format
+    return {
+      id: newOrder.id,
+      status: newOrder.status,
+      side: newOrder.side,
+      tokenIn: newOrder.tokenIn,
+      tokenOut: newOrder.tokenOut,
+      amountIn: newOrder.amountIn,
+      feeBps,
+      estimatedAmountOut,
+      createdAt: newOrder.createdAt,
+    };
   },
 
   async getOrders(filters = {}): Promise<MarketOrdersResponse> {
@@ -217,7 +233,7 @@ export const mockMarketApi: MarketApiInterface = {
     return order;
   },
 
-  async cancelOrder(id: string): Promise<MarketOrder> {
+  async cancelOrder(id: string): Promise<{ id: string; status: string; canceledAt: string }> {
     await delay(300);
 
     const order = mockOrders.find(o => o.id === id);
@@ -232,7 +248,11 @@ export const mockMarketApi: MarketApiInterface = {
     order.status = 'CANCELED';
     order.updatedAt = new Date().toISOString();
 
-    return order;
+    return {
+      id: order.id,
+      status: order.status,
+      canceledAt: order.updatedAt,
+    };
   },
 
   async getOrderbook(pair: string): Promise<Orderbook> {

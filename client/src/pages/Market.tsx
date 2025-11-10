@@ -115,11 +115,15 @@ export default function Market() {
       return;
     }
 
+    // Generate idempotencyKey for preventing duplicate orders
+    const idempotencyKey = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
     createOrderMutation.mutate({
       side: orderType,
       tokenIn: orderType === "buy" ? "USDC" : "POI",
       tokenOut: orderType === "buy" ? "POI" : "USDC",
       amountIn: amount,
+      idempotencyKey,
     });
   };
 

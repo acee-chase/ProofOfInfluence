@@ -14,6 +14,7 @@ export interface MarketOrder {
   tokenOut: string;
   amountIn: string;
   amountOut?: string;
+  quotedAmountOut?: string;  // Codex backend returns this for estimated amounts
   feeBps: number;
   status: 'PENDING' | 'FILLED' | 'PARTIAL' | 'CANCELED' | 'FAILED';
   txRef?: string;
@@ -30,7 +31,19 @@ export interface CreateOrderRequest {
   tokenIn: string;
   tokenOut: string;
   amountIn: string;
-  idempotencyKey?: string;
+  idempotencyKey: string;  // Required for idempotency (Codex backend)
+}
+
+export interface CreateOrderResponse {
+  id: string;
+  status: string;
+  side: string;
+  tokenIn: string;
+  tokenOut: string;
+  amountIn: string;
+  feeBps: number;
+  estimatedAmountOut: string;  // Codex returns this field
+  createdAt: string;
 }
 
 export interface OrderbookEntry {
@@ -202,11 +215,11 @@ export interface MerchantAnalytics {
 // ============================================
 
 export interface MarketApiInterface {
-  createOrder(data: CreateOrderRequest): Promise<MarketOrder>;
+  createOrder(data: CreateOrderRequest): Promise<CreateOrderResponse>;
   getOrders(filters?: { status?: string; limit?: number; offset?: number }): Promise<MarketOrdersResponse>;
   getOrderById(id: string): Promise<MarketOrder>;
   updateOrder(id: string, data: Partial<CreateOrderRequest>): Promise<MarketOrder>;
-  cancelOrder(id: string): Promise<MarketOrder>;
+  cancelOrder(id: string): Promise<{ id: string; status: string; canceledAt: string }>;
   getOrderbook(pair: string): Promise<Orderbook>;
   getTrades(pair: string, limit?: number): Promise<{ trades: Trade[] }>;
   getStats(pair: string): Promise<MarketStats>;
