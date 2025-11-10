@@ -10,7 +10,7 @@
 
 在浏览器中打开：
 ```
-https://github.com/chickendinner-chase/ProofOfInfluence/settings
+https://github.com/acee-chase/ProofOfInfluence/settings
 ```
 
 ### 2. 转为私有
@@ -73,7 +73,7 @@ Cursor 使用本地 Git，无需特殊授权。
 #### 1. 克隆私有仓库
 
 ```bash
-git clone https://github.com/chickendinner-chase/ProofOfInfluence.git
+git clone https://github.com/acee-chase/ProofOfInfluence.git
 ```
 
 #### 2. 首次 clone 可能需要认证
@@ -98,7 +98,7 @@ git clone https://github.com/chickendinner-chase/ProofOfInfluence.git
 
 6. 使用 Token 克隆：
    ```bash
-   git clone https://github.com/chickendinner-chase/ProofOfInfluence.git
+   git clone https://github.com/acee-chase/ProofOfInfluence.git
    # Username: your_github_username
    # Password: ghp_... (paste your token)
    ```
@@ -123,7 +123,7 @@ git clone https://github.com/chickendinner-chase/ProofOfInfluence.git
 
 3. 使用 SSH 克隆：
    ```bash
-   git clone git@github.com:chickendinner-chase/ProofOfInfluence.git
+   git clone git@github.com:acee-chase/ProofOfInfluence.git
    ```
 
 ---
@@ -134,7 +134,7 @@ git clone https://github.com/chickendinner-chase/ProofOfInfluence.git
 
 1. 访问仓库设置：
    ```
-   https://github.com/chickendinner-chase/ProofOfInfluence/settings/access
+   https://github.com/acee-chase/ProofOfInfluence/settings/access
    ```
 
 2. 点击 **"Invite a collaborator"**
@@ -166,7 +166,7 @@ git clone https://github.com/chickendinner-chase/ProofOfInfluence.git
 
 1. 访问：
    ```
-   https://github.com/chickendinner-chase/ProofOfInfluence/settings/branches
+   https://github.com/acee-chase/ProofOfInfluence/settings/branches
    ```
 
 2. 点击 **"Add rule"**
@@ -198,7 +198,7 @@ https://github.com/settings/security
 #### 2. 审计日志
 定期查看访问日志：
 ```
-https://github.com/chickendinner-chase/ProofOfInfluence/settings/security_analysis
+https://github.com/acee-chase/ProofOfInfluence/settings/security_analysis
 ```
 
 #### 3. Secret Scanning

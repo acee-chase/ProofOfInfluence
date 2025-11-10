@@ -33,7 +33,7 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/chickendinner-chase/ProofOfInfluence.git
+git clone https://github.com/acee-chase/ProofOfInfluence.git
 cd ProofOfInfluence
 ```
 

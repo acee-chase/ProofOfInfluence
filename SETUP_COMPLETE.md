@@ -195,7 +195,7 @@ ProofOfInfluence/
 ### 1. GitHub 仓库管理
 
 **转为私有仓库**：
-1. 访问：https://github.com/chickendinner-chase/ProofOfInfluence/settings
+1. 访问：https://github.com/acee-chase/ProofOfInfluence/settings
 2. Danger Zone → Change visibility → Make private
 3. 确认：输入仓库名 `ProofOfInfluence`
 
