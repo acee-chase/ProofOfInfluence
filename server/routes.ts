@@ -53,6 +53,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }
       }
       
+      // Development mode: Grant admin access to all users if DEV_MODE_ADMIN is enabled
+      // IMPORTANT: Only works when NODE_ENV is explicitly set to 'development' for security
+      // This prevents accidental admin access in production or staging environments
+      const isDevelopment = process.env.NODE_ENV === 'development';
+      const devModeAdmin = process.env.DEV_MODE_ADMIN === 'true';
+      
+      if (user && isDevelopment && devModeAdmin) {
+        // Override user role to admin in development mode for testing
+        user.role = 'admin';
+        console.log(`[DEV MODE] Admin access granted to user ${user.email || user.id}`);
+      }
+      
       res.json(user);
     } catch (error) {
       console.error("Error fetching user:", error);

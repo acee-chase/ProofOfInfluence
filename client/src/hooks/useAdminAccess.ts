@@ -1,6 +1,9 @@
 /**
  * Admin Access Control Hook
  * Checks if current user has admin role for Reserve Pool access
+ * 
+ * In development mode (DEV_MODE_ADMIN=true), all users automatically get admin access
+ * This is controlled server-side for security
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -11,9 +14,9 @@ export function useAdminAccess() {
     queryKey: ["/api/auth/user"],
   });
 
-  // Check if user has admin role
-  // Note: Role checking logic may need to be adjusted based on actual user schema
-  const isAdmin = user?.email?.includes('admin') || false; // TODO: Replace with actual role field when available
+  // Check if user has admin role (enforced by backend)
+  // In dev mode with DEV_MODE_ADMIN=true, backend automatically assigns admin role
+  const isAdmin = user?.role === 'admin';
   
   return {
     isAdmin,
