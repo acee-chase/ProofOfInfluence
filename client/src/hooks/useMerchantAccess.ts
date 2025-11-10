@@ -1,6 +1,9 @@
 /**
  * Merchant Access Control Hook
  * Checks if current user has merchant role and provides merchantId
+ * 
+ * In development mode (DEV_MODE_ADMIN=true), all users with admin role get merchant access
+ * This is controlled server-side for security
  */
 
 import { useQuery } from "@tanstack/react-query";
@@ -11,16 +14,17 @@ export function useMerchantAccess() {
     queryKey: ["/api/auth/user"],
   });
 
-  // Check if user has merchant role
-  // Note: Role checking logic may need to be adjusted based on actual user schema
-  const isMerchant = user?.email?.includes('merchant') || user?.email?.includes('admin') || false; // TODO: Replace with actual role field
+  // Check if user has merchant or admin role (enforced by backend)
+  // In dev mode with DEV_MODE_ADMIN=true, backend automatically assigns admin role
+  const isAdmin = user?.role === 'admin';
+  const isMerchant = user?.role === 'merchant' || user?.role === 'admin';
   
   // Use userId as merchantId by default (per Codex backend design)
   const merchantId = user?.id;
 
   return {
     isMerchant,
-    isAdmin: user?.email?.includes('admin') || false,
+    isAdmin,
     merchantId,
     canAccessMerchant: isMerchant,
   };
