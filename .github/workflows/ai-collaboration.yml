@@ -25,16 +25,16 @@ jobs:
         run: |
           echo "Analyzing changes in ${{ github.ref_name }}..."
           
-          # Check what changed
-          CONTRACTS_CHANGED=$(git diff --name-only HEAD^ HEAD | grep -c "^contracts/" || echo "0")
-          FRONTEND_CHANGED=$(git diff --name-only HEAD^ HEAD | grep -c "^client/" || echo "0")
-          BACKEND_CHANGED=$(git diff --name-only HEAD^ HEAD | grep -c "^server/" || echo "0")
-          SCRIPTS_CHANGED=$(git diff --name-only HEAD^ HEAD | grep -c "^scripts/" || echo "0")
+          # Check what changed (use wc -l instead of grep -c to avoid format issues)
+          CONTRACTS_CHANGED=$(git diff --name-only HEAD^ HEAD | grep "^contracts/" | wc -l || echo "0")
+          FRONTEND_CHANGED=$(git diff --name-only HEAD^ HEAD | grep "^client/" | wc -l || echo "0")
+          BACKEND_CHANGED=$(git diff --name-only HEAD^ HEAD | grep "^server/" | wc -l || echo "0")
+          SCRIPTS_CHANGED=$(git diff --name-only HEAD^ HEAD | grep "^scripts/" | wc -l || echo "0")
           
-          echo "contracts=$CONTRACTS_CHANGED" >> $GITHUB_OUTPUT
-          echo "frontend=$FRONTEND_CHANGED" >> $GITHUB_OUTPUT
-          echo "backend=$BACKEND_CHANGED" >> $GITHUB_OUTPUT
-          echo "scripts=$SCRIPTS_CHANGED" >> $GITHUB_OUTPUT
+          echo "contracts=${CONTRACTS_CHANGED}" >> $GITHUB_OUTPUT
+          echo "frontend=${FRONTEND_CHANGED}" >> $GITHUB_OUTPUT
+          echo "backend=${BACKEND_CHANGED}" >> $GITHUB_OUTPUT
+          echo "scripts=${SCRIPTS_CHANGED}" >> $GITHUB_OUTPUT
           
           # Get commit info (title only to avoid multiline issues)
           echo "message=$(git log -1 --pretty=%s)" >> $GITHUB_OUTPUT
