@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -34,6 +34,23 @@ export default function Market() {
   const [orderType, setOrderType] = useState<"buy" | "sell">("buy");
   const [amount, setAmount] = useState("");
   const [price, setPrice] = useState("");
+
+  // 从 URL 参数读取预设金额
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const buyAmount = params.get('buy');
+    if (buyAmount && !isNaN(parseFloat(buyAmount))) {
+      setAmount(buyAmount);
+      setOrderType('buy');
+      // 滚动到订单表单
+      setTimeout(() => {
+        document.getElementById('order-form')?.scrollIntoView({ 
+          behavior: 'smooth',
+          block: 'center'
+        });
+      }, 500);
+    }
+  }, []);
 
   // Fetch current user
   const { data: user } = useQuery<User>({
@@ -399,11 +416,11 @@ export default function Market() {
               <UniswapSwapCard />
             </Card>
 
-            {/* Order Placement Form */}
-            <Card className="p-6 bg-slate-800/50 border-slate-700">
-              <h3 className="text-lg font-semibold text-white mb-4">
-                市价订单
-              </h3>
+          {/* Order Placement Form */}
+          <Card id="order-form" className="p-6 bg-slate-800/50 border-slate-700">
+            <h3 className="text-lg font-semibold text-white mb-4">
+              市价订单
+            </h3>
               <div className="space-y-4">
                 <div className="grid grid-cols-2 gap-2">
                   <Button
