@@ -1,16 +1,21 @@
 # Custom GPT Setup Guide
 
-Complete guide to setting up Custom GPT for ProofOfInfluence AI task management.
+Complete guide to setting up Custom GPT for ProofOfInfluence AI task management with GitHub and Slack integration.
 
 ## Overview
 
-This guide will help you create a Custom GPT that can automatically create and manage GitHub Issues for coordinating Cursor, Codex, and Replit AI.
+This guide will help you create a Custom GPT that can automatically create and manage GitHub Issues **and** send notifications to Slack for coordinating Cursor, Codex, and Replit AI.
+
+**Two Integration Options:**
+1. **GitHub Only** (Original) - Tasks via GitHub Issues
+2. **GitHub + Slack** (Recommended) - Tasks + Real-time Slack notifications
 
 ## Prerequisites
 
 - ✅ ChatGPT Plus subscription ($20/month)
 - ✅ GitHub account with repo access
 - ✅ Replit account
+- ✅ Slack workspace (optional, for enhanced collaboration)
 
 ---
 
@@ -39,7 +44,9 @@ ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 
 1. Open your Replit project: https://replit.com/@youruser/ProofOfInfluence
 2. Click Secrets (🔒 icon) in left sidebar
-3. Add two secrets:
+3. Add the following secrets:
+
+### Required Secrets
 
 | Key | Value | Description |
 |-----|-------|-------------|
@@ -51,6 +58,26 @@ ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 # Use any strong random string, e.g.:
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
 ```
+
+### Optional: Slack Integration Secrets
+
+If you want Slack notifications (recommended):
+
+| Key | Value | Description |
+|-----|-------|-------------|
+| `SLACK_BOT_TOKEN` | `xoxb-xxx...` | Slack Bot User OAuth Token |
+| `SLACK_CHANNEL_COORDINATION` | `C01234567` | #ai-coordination channel ID |
+| `SLACK_CHANNEL_CURSOR` | `C01234568` | #cursor-dev channel ID |
+| `SLACK_CHANNEL_CODEX` | `C01234569` | #codex-contracts channel ID |
+| `SLACK_CHANNEL_REPLIT` | `C01234570` | #replit-deploy channel ID |
+| `SLACK_CHANNEL_COMMITS` | `C01234571` | #github-commits channel ID |
+
+**Get Slack credentials:**
+- See [Slack Bot Setup Guide](./SLACK_BOT_SETUP.md) for detailed instructions
+- Get `SLACK_BOT_TOKEN` from https://api.slack.com/apps (after creating Slack App)
+- Get Channel IDs from Slack channel details (see guide)
+
+**Note**: If you skip Slack setup, the API server will still work (GitHub only mode).
 
 ---
 
@@ -113,6 +140,8 @@ You can create and manage GitHub Issues to assign tasks to the AIs using these l
 - @codex - For smart contract tasks
 - @replit - For deployment tasks
 
+You can also send real-time notifications to Slack channels for instant collaboration.
+
 Status labels:
 - status:ready - Task ready to start
 - status:in-progress - Currently being worked on
@@ -127,25 +156,49 @@ When creating tasks:
 3. Assign to appropriate AI
 4. Set priority (low/medium/high) if important
 5. Mention component (frontend/backend/contracts)
+6. Optionally send Slack notification for urgent tasks
 
 ## Communication Style
 
 Be concise and professional. When tasks are created, confirm with:
 "✅ Created Issue #XX for [AI name]"
+If Slack is enabled: "📬 Slack notification sent to #channel"
 
 When checking status, provide clear summaries:
 "Cursor has 2 tasks in-progress, 1 completed"
 
+## Slack Integration
+
+When Slack is enabled, you can:
+- Send task completion notifications
+- Send deployment status updates
+- Send custom messages to specific channels
+- Alert teams about urgent issues
+
+Use Slack for:
+- High-priority tasks that need immediate attention
+- Task completions that require handoff
+- Deployment notifications
+- General team coordination
+
 ## Example Interactions
 
 User: "Create backend API task for Market module"
-You: Use create_task to create Issue with @cursor label
+You: 
+1. Use create_task to create Issue with @cursor label
+2. If high priority, use slack_send_message to notify #cursor-dev
 
 User: "Check Codex's progress"
 You: Use list_tasks to get Codex's current tasks and summarize
 
-User: "Mark task #42 as in-progress"
-You: Use update_status to change task status
+User: "Mark task #42 as complete and notify next AI"
+You:
+1. Update task status in GitHub
+2. Use slack_task_complete to send completion notification
+3. Tag next AI if there's a handoff
+
+User: "Alert team about production deployment"
+You: Use slack_deployment to send deployment notification to Slack
 ```
 
 ### Configure Name & Description
@@ -376,6 +429,8 @@ When Codex completes a contract task:
 
 ## API Endpoints Reference
 
+### GitHub Endpoints
+
 | Endpoint | Method | Purpose |
 |----------|--------|---------|
 | `/health` | GET | Health check |
@@ -386,7 +441,19 @@ When Codex completes a contract task:
 | `/api/tasks/:id/comment` | POST | Add comment |
 | `/api/project/status` | GET | Project summary |
 
-Full API documentation: See `api-server/openapi.yaml`
+### Slack Endpoints (Optional)
+
+| Endpoint | Method | Purpose |
+|----------|--------|---------|
+| `/api/slack/task/complete` | POST | Send task completion notification |
+| `/api/slack/task/status` | POST | Send status update notification |
+| `/api/slack/deployment` | POST | Send deployment notification |
+| `/api/slack/commit` | POST | Send commit notification |
+| `/api/slack/message` | POST | Send custom message |
+
+**Note**: Slack endpoints return 503 if `SLACK_BOT_TOKEN` is not configured.
+
+Full API documentation: See `api-server/openapi.yaml` and `api-server/README.md`
 
 ---
 
@@ -431,12 +498,34 @@ For issues:
 1. Check Replit console logs
 2. Test API endpoints directly
 3. Verify GitHub token permissions
-4. Review this guide
-5. Create GitHub Issue with `@cursor` label
+4. If using Slack, check Slack Bot configuration
+5. Review this guide
+6. Create GitHub Issue with `@cursor` label
+
+---
+
+## Additional Resources
+
+### Slack Integration
+
+For Slack setup and usage:
+- **[Slack Bot Setup Guide](./SLACK_BOT_SETUP.md)** - Complete Slack Bot configuration
+- **[Slack Collaboration Guide](./SLACK_COLLABORATION.md)** - Workflows and best practices
+- **[API Server README](../api-server/README.md)** - API endpoint documentation
+
+### GitHub Integration
+
+- **[Git Workflow](./GIT_WORKFLOW.md)** - Development workflow and branching
+- **[Replit Workflow](./REPLIT_WORKFLOW.md)** - Deployment procedures
+
+### AI Rules
+
+- **[.cursorrules](../.cursorrules)** - Cursor AI development guidelines
+- **[.codexrules](../.codexrules)** - Codex AI contract guidelines
 
 ---
 
 **Custom GPT Project Manager is now ready!**
 
-You can now use natural language in ChatGPT to manage your entire development workflow.
+You can now use natural language in ChatGPT to manage your entire development workflow with GitHub Issues and optional Slack notifications for real-time collaboration.
 

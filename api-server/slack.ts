@@ -1,0 +1,63 @@
+﻿import https from 'https';
+
+export interface SlackMessage {
+  channel: string;
+  text: string;
+}
+
+export class SlackClient {
+  private botToken: string;
+  private channels: any;
+
+  constructor(botToken: string, channels: any) {
+    this.botToken = botToken;
+    this.channels = channels;
+  }
+
+  async sendMessage(message: SlackMessage): Promise<any> {
+    console.log('Slack message would be sent:', message);
+    return { ok: true };
+  }
+
+  async notifyTaskCreated(task: any): Promise<any> {
+    return this.sendMessage({
+      channel: this.channels.coordination,
+      text: New task created: 
+    });
+  }
+
+  async notifyTaskCompleted(task: any): Promise<any> {
+    return this.sendMessage({
+      channel: this.channels.coordination,
+      text: Task completed: 
+    });
+  }
+
+  async notifyDeployment(deployment: any): Promise<any> {
+    return this.sendMessage({
+      channel: this.channels.replit,
+      text: Deployment: 
+    });
+  }
+
+  async notifyCommit(commit: any): Promise<any> {
+    return this.sendMessage({
+      channel: this.channels.commits,
+      text: New commit: 
+    });
+  }
+
+  async sendToChannel(channel: string, text: string): Promise<any> {
+    return this.sendMessage({
+      channel: this.channels[channel],
+      text
+    });
+  }
+
+  async notifyTaskStatusUpdate(taskId: string, title: string, oldStatus: string, newStatus: string): Promise<any> {
+    return this.sendMessage({
+      channel: this.channels.coordination,
+      text: Task  status:  -> 
+    });
+  }
+}
