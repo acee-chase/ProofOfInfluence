@@ -2,6 +2,7 @@ import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import { GitHubClient } from './github.js';
+import { SlackClient } from './slack.js';
 
 dotenv.config();
 
@@ -45,6 +46,24 @@ if (!githubToken) {
 
 const github = new GitHubClient(githubToken);
 
+// Initialize Slack client (optional - only if Slack integration is enabled)
+let slack: SlackClient | null = null;
+const slackToken = process.env.SLACK_BOT_TOKEN;
+const slackChannels = {
+  coordination: process.env.SLACK_CHANNEL_COORDINATION || 'C01234567',
+  cursor: process.env.SLACK_CHANNEL_CURSOR || 'C01234568',
+  codex: process.env.SLACK_CHANNEL_CODEX || 'C01234569',
+  replit: process.env.SLACK_CHANNEL_REPLIT || 'C01234570',
+  commits: process.env.SLACK_CHANNEL_COMMITS || 'C01234571'
+};
+
+if (slackToken) {
+  slack = new SlackClient(slackToken, slackChannels);
+  console.log('✅ Slack integration enabled');
+} else {
+  console.log('⚠️  Slack integration disabled (SLACK_BOT_TOKEN not set)');
+}
+
 // Health check endpoint (no auth required)
 app.get('/health', (req, res) => {
   res.json({ status: 'ok', service: 'ProofOfInfluence API Server' });
@@ -82,6 +101,22 @@ app.post('/api/tasks/create', async (req, res) => {
       priority,
       component
     });
+
+    // Send Slack notification if enabled
+    if (slack) {
+      try {
+        await slack.notifyTaskCreated({
+          taskId: result.number.toString(),
+          title,
+          assignee,
+          priority,
+          description
+        });
+      } catch (slackError: any) {
+        console.error('Slack notification failed:', slackError.message);
+        // Don't fail the request if Slack notification fails
+      }
+    }
 
     res.json(result);
   } catch (error: any) {
@@ -195,16 +230,186 @@ app.get('/api/project/status', async (req, res) => {
   }
 });
 
+/**
+ * POST /api/slack/task/complete
+ * Send task completion notification to Slack
+ */
+app.post('/api/slack/task/complete', async (req, res) => {
+  if (!slack) {
+    return res.status(503).json({ error: 'Slack integration not enabled' });
+  }
+
+  try {
+    const { taskId, title, completedBy, branch, commit, files, nextAI, nextAction } = req.body;
+
+    if (!taskId || !title || !completedBy) {
+      return res.status(400).json({ error: 'taskId, title, and completedBy are required' });
+    }
+
+    await slack.notifyTaskCompleted({
+      taskId,
+      title,
+      completedBy,
+      branch,
+      commit,
+      files,
+      nextAI,
+      nextAction
+    });
+
+    res.json({ success: true, message: 'Task completion notification sent' });
+  } catch (error: any) {
+    console.error('Error sending Slack notification:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/slack/task/status
+ * Send task status update notification to Slack
+ */
+app.post('/api/slack/task/status', async (req, res) => {
+  if (!slack) {
+    return res.status(503).json({ error: 'Slack integration not enabled' });
+  }
+
+  try {
+    const { taskId, title, oldStatus, newStatus, note } = req.body;
+
+    if (!taskId || !title || !oldStatus || !newStatus) {
+      return res.status(400).json({ error: 'taskId, title, oldStatus, and newStatus are required' });
+    }
+
+    await slack.notifyTaskStatusUpdate(taskId, title, oldStatus, newStatus, note);
+
+    res.json({ success: true, message: 'Status update notification sent' });
+  } catch (error: any) {
+    console.error('Error sending Slack notification:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/slack/deployment
+ * Send deployment notification to Slack
+ */
+app.post('/api/slack/deployment', async (req, res) => {
+  if (!slack) {
+    return res.status(503).json({ error: 'Slack integration not enabled' });
+  }
+
+  try {
+    const { environment, branch, commit, status, url, duration, error } = req.body;
+
+    if (!environment || !branch || !commit || !status) {
+      return res.status(400).json({ error: 'environment, branch, commit, and status are required' });
+    }
+
+    if (!['production', 'staging', 'testing'].includes(environment)) {
+      return res.status(400).json({ error: 'environment must be production, staging, or testing' });
+    }
+
+    if (!['started', 'success', 'failed'].includes(status)) {
+      return res.status(400).json({ error: 'status must be started, success, or failed' });
+    }
+
+    await slack.notifyDeployment({
+      environment,
+      branch,
+      commit,
+      status,
+      url,
+      duration,
+      error
+    });
+
+    res.json({ success: true, message: 'Deployment notification sent' });
+  } catch (err: any) {
+    console.error('Error sending Slack notification:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+/**
+ * POST /api/slack/commit
+ * Send commit notification to Slack
+ */
+app.post('/api/slack/commit', async (req, res) => {
+  if (!slack) {
+    return res.status(503).json({ error: 'Slack integration not enabled' });
+  }
+
+  try {
+    const { branch, message, author, sha, url, filesChanged } = req.body;
+
+    if (!branch || !message || !author || !sha || !url) {
+      return res.status(400).json({ error: 'branch, message, author, sha, and url are required' });
+    }
+
+    await slack.notifyCommit({
+      branch,
+      message,
+      author,
+      sha,
+      url,
+      filesChanged: filesChanged || 0
+    });
+
+    res.json({ success: true, message: 'Commit notification sent' });
+  } catch (error: any) {
+    console.error('Error sending Slack notification:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * POST /api/slack/message
+ * Send a custom message to a Slack channel
+ */
+app.post('/api/slack/message', async (req, res) => {
+  if (!slack) {
+    return res.status(503).json({ error: 'Slack integration not enabled' });
+  }
+
+  try {
+    const { channel, text, blocks } = req.body;
+
+    if (!channel || !text) {
+      return res.status(400).json({ error: 'channel and text are required' });
+    }
+
+    if (!['coordination', 'cursor', 'codex', 'replit', 'commits'].includes(channel)) {
+      return res.status(400).json({ error: 'invalid channel' });
+    }
+
+    await slack.sendToChannel(channel, text, blocks);
+
+    res.json({ success: true, message: 'Message sent to Slack' });
+  } catch (error: any) {
+    console.error('Error sending Slack message:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log(`🚀 API Server running on port ${PORT}`);
-  console.log(`📋 Endpoints:`);
-  console.log(`   POST /api/tasks/create`);
-  console.log(`   GET  /api/tasks/list`);
-  console.log(`   GET  /api/tasks/:id`);
+  console.log(`📋 GitHub Endpoints:`);
+  console.log(`   POST  /api/tasks/create`);
+  console.log(`   GET   /api/tasks/list`);
+  console.log(`   GET   /api/tasks/:id`);
   console.log(`   PATCH /api/tasks/:id/status`);
-  console.log(`   POST /api/tasks/:id/comment`);
-  console.log(`   GET  /api/project/status`);
+  console.log(`   POST  /api/tasks/:id/comment`);
+  console.log(`   GET   /api/project/status`);
+  
+  if (slack) {
+    console.log(`💬 Slack Endpoints:`);
+    console.log(`   POST  /api/slack/task/complete`);
+    console.log(`   POST  /api/slack/task/status`);
+    console.log(`   POST  /api/slack/deployment`);
+    console.log(`   POST  /api/slack/commit`);
+    console.log(`   POST  /api/slack/message`);
+  }
 });
 
 export default app;

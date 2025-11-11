@@ -1,6 +1,6 @@
 # API Server for ProofOfInfluence
 
-RESTful API server that enables ChatGPT Custom GPT to manage GitHub Issues for AI collaboration.
+RESTful API server that enables ChatGPT Custom GPT and Slack to manage GitHub Issues and AI collaboration.
 
 ## Quick Start
 
@@ -16,10 +16,21 @@ npm install
 Create `.env` file or use Replit Secrets:
 
 ```env
+# Required
 GITHUB_TOKEN=ghp_your_github_personal_access_token
 API_SECRET_KEY=your_secret_key_for_authentication
 API_PORT=3001
+
+# Optional: Slack Integration
+SLACK_BOT_TOKEN=xoxb-your-slack-bot-token
+SLACK_CHANNEL_COORDINATION=C01234567
+SLACK_CHANNEL_CURSOR=C01234568
+SLACK_CHANNEL_CODEX=C01234569
+SLACK_CHANNEL_REPLIT=C01234570
+SLACK_CHANNEL_COMMITS=C01234571
 ```
+
+**Note**: Slack integration is optional. If `SLACK_BOT_TOKEN` is not set, Slack endpoints will return 503 Service Unavailable.
 
 ### Run Locally
 
@@ -155,6 +166,107 @@ Response:
   }
 }
 ```
+
+---
+
+## Slack Endpoints
+
+### Send Task Completion Notification
+
+```
+POST /api/slack/task/complete
+Authorization: Bearer {API_SECRET_KEY}
+Content-Type: application/json
+
+{
+  "taskId": "42",
+  "title": "Implement Market API",
+  "completedBy": "Cursor AI",
+  "branch": "cursor/feat-market-api",
+  "commit": "abc123def456",
+  "files": ["server/routes.ts", "server/market.ts"],
+  "nextAI": "replit",
+  "nextAction": "请部署到测试环境"
+}
+```
+
+### Send Task Status Update
+
+```
+POST /api/slack/task/status
+Authorization: Bearer {API_SECRET_KEY}
+Content-Type: application/json
+
+{
+  "taskId": "42",
+  "title": "Implement Market API",
+  "oldStatus": "pending",
+  "newStatus": "in_progress",
+  "note": "开始开发后端 API"
+}
+```
+
+### Send Deployment Notification
+
+```
+POST /api/slack/deployment
+Authorization: Bearer {API_SECRET_KEY}
+Content-Type: application/json
+
+{
+  "environment": "staging",
+  "branch": "dev",
+  "commit": "abc123def456",
+  "status": "success",
+  "url": "https://dev-poi.replit.app",
+  "duration": "2m 15s"
+}
+```
+
+**Status values**: `started`, `success`, `failed`
+
+**Environment values**: `production`, `staging`, `testing`
+
+### Send Commit Notification
+
+```
+POST /api/slack/commit
+Authorization: Bearer {API_SECRET_KEY}
+Content-Type: application/json
+
+{
+  "branch": "dev",
+  "message": "feat(frontend): add market dashboard (Cursor)",
+  "author": "acee-chase",
+  "sha": "abc123def456789",
+  "url": "https://github.com/acee-chase/ProofOfInfluence/commit/abc123",
+  "filesChanged": 5
+}
+```
+
+### Send Custom Message
+
+```
+POST /api/slack/message
+Authorization: Bearer {API_SECRET_KEY}
+Content-Type: application/json
+
+{
+  "channel": "coordination",
+  "text": "🤖 AI Status: All systems operational",
+  "blocks": [
+    {
+      "type": "section",
+      "text": {
+        "type": "mrkdwn",
+        "text": "*AI Status Update*\n✅ Cursor: Online\n✅ Codex: Online\n✅ Replit: Online"
+      }
+    }
+  ]
+}
+```
+
+**Channel values**: `coordination`, `cursor`, `codex`, `replit`, `commits`
 
 ---
 
