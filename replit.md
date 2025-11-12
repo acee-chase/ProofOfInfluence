@@ -195,6 +195,20 @@ Preferred communication style: Simple, everyday language.
 - Channels: `#ai-coordination`, `#cursor-dev`, `#codex-contracts`, `#replit-deploy`
 - Real-time task notifications and coordination
 
+**Model Context Protocol (MCP) Integration:**
+- Configuration file: `mcp-config.json`
+- MCP servers configured for enhanced AI capabilities:
+  - **Filesystem Server** - Secure file operations across project directory
+  - **GitHub Server** - Repository access and manipulation using `GITHUB_TOKEN`
+  - **Memory Server** - Persistent knowledge graph for project context
+  - **Fetch Server** - Web content retrieval (requires user confirmation)
+- MCP enables Replit Agent to:
+  - Access and analyze project files systematically
+  - Interact with GitHub repository (issues, PRs, code)
+  - Maintain project knowledge across sessions
+  - Fetch external documentation and resources
+- Transport: stdio via NPX for all servers
+
 ### Development Tools
 
 **Build Tools:**
