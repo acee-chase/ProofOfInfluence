@@ -87,9 +87,22 @@ app.get('/openapi.yaml', (req, res) => {
 // Protected API endpoints
 app.use('/api', authenticate);
 
+// ✅ In-memory task status tracking (简单版本)
+const taskStatus = new Map<string, {
+  status: 'processing' | 'completed' | 'failed';
+  taskId?: string;
+  issueNumber?: number;
+  issueUrl?: string;
+  error?: string;
+  createdAt: Date;
+}>();
+
 /**
  * POST /api/tasks/create
- * Create a new GitHub Issue for AI task
+ * Create a new GitHub Issue for AI task (ASYNC)
+ * 
+ * Returns immediately with 202 Accepted + taskId
+ * Processes GitHub + Slack in background
  */
 app.post('/api/tasks/create', async (req, res) => {
   try {
@@ -103,35 +116,99 @@ app.post('/api/tasks/create', async (req, res) => {
       return res.status(400).json({ error: 'assignee must be cursor, codex, or replit' });
     }
 
-    const result = await github.createTask({
-      title,
-      assignee,
-      description: description || '',
-      priority,
-      component
+    // ✅ 生成任务 ID
+    const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    
+    // ✅ 立即返回 202 Accepted
+    taskStatus.set(taskId, {
+      status: 'processing',
+      taskId,
+      createdAt: new Date()
     });
 
-    // Send Slack notification if enabled
-    if (slack) {
+    console.log(`📋 Task ${taskId} accepted, processing in background...`);
+
+    res.status(202).json({
+      status: 'accepted',
+      message: '任务已接收，正在后台处理',
+      taskId,
+      statusUrl: `/api/tasks/status/${taskId}`,
+      note: 'GitHub Issue 正在创建中，请稍后查询状态或查看 GitHub'
+    });
+
+    // ✅ 异步处理（不阻塞响应）
+    setImmediate(async () => {
       try {
-        await slack.notifyTaskCreated({
-          taskId: result.number.toString(),
+        console.log(`🔄 Processing task ${taskId}...`);
+        
+        // 创建 GitHub Issue
+        const result = await github.createTask({
           title,
           assignee,
+          description: description || '',
           priority,
-          description
+          component
         });
-      } catch (slackError: any) {
-        console.error('Slack notification failed:', slackError.message);
-        // Don't fail the request if Slack notification fails
-      }
-    }
 
-    res.json(result);
+        console.log(`✅ GitHub Issue #${result.number} created for task ${taskId}`);
+
+        // 更新状态
+        taskStatus.set(taskId, {
+          status: 'completed',
+          taskId,
+          issueNumber: result.number,
+          issueUrl: result.url,
+          createdAt: taskStatus.get(taskId)!.createdAt
+        });
+
+        // 发送 Slack 通知（不影响主流程）
+        if (slack) {
+          try {
+            await slack.notifyTaskCreated({
+              taskId: result.number.toString(),
+              title,
+              assignee,
+              priority,
+              description
+            });
+            console.log(`💬 Slack notification sent for task ${taskId}`);
+          } catch (slackError: any) {
+            console.error(`⚠️  Slack notification failed for task ${taskId}:`, slackError.message);
+          }
+        }
+
+      } catch (error: any) {
+        console.error(`❌ Task ${taskId} failed:`, error.message);
+        
+        // 更新为失败状态
+        taskStatus.set(taskId, {
+          status: 'failed',
+          taskId,
+          error: error.message,
+          createdAt: taskStatus.get(taskId)!.createdAt
+        });
+      }
+    });
+
   } catch (error: any) {
-    console.error('Error creating task:', error);
+    console.error('Error accepting task:', error);
     res.status(500).json({ error: error.message });
   }
+});
+
+/**
+ * GET /api/tasks/status/:taskId
+ * Query async task status
+ */
+app.get('/api/tasks/status/:taskId', (req, res) => {
+  const { taskId } = req.params;
+  const status = taskStatus.get(taskId);
+
+  if (!status) {
+    return res.status(404).json({ error: 'Task not found' });
+  }
+
+  res.json(status);
 });
 
 /**
@@ -415,6 +492,15 @@ app.listen(PORT, () => {
     console.log(`💬 Slack Endpoints:`);
     console.log(`   POST  /api/slack/task/complete`);
     console.log(`   POST  /api/slack/task/status`);
+    console.log(`   POST  /api/slack/deployment`);
+    console.log(`   POST  /api/slack/commit`);
+    console.log(`   POST  /api/slack/message`);
+  }
+});
+
+export default app;
+
+
     console.log(`   POST  /api/slack/deployment`);
     console.log(`   POST  /api/slack/commit`);
     console.log(`   POST  /api/slack/message`);

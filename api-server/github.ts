@@ -7,7 +7,12 @@ export class GitHubClient {
   private octokit: Octokit;
 
   constructor(token: string) {
-    this.octokit = new Octokit({ auth: token });
+    this.octokit = new Octokit({ 
+      auth: token,
+      request: {
+        timeout: 15000  // ✅ 15 秒超时
+      }
+    });
   }
 
   /**
@@ -20,33 +25,50 @@ export class GitHubClient {
     priority?: 'low' | 'medium' | 'high';
     component?: string;
   }) {
-    const labels = [
-      `@${params.assignee}`,
-      'status:ready'
-    ];
+    try {
+      console.log('🔍 Creating GitHub Issue...');
+      console.log('   Title:', params.title);
+      console.log('   Assignee:', params.assignee);
+      
+      // ✅ 简化 labels - GitHub 会自动创建不存在的标签
+      const labels = [`ai:${params.assignee}`];
+      
+      if (params.priority) {
+        labels.push(params.priority);
+      }
 
-    if (params.priority) {
-      labels.push(`priority:${params.priority}`);
+      if (params.component) {
+        labels.push(params.component);
+      }
+
+      console.log('   Labels:', labels);
+
+      const issue = await this.octokit.issues.create({
+        owner: OWNER,
+        repo: REPO,
+        title: `[${params.assignee.toUpperCase()}] ${params.title}`,
+        body: params.description,
+        labels
+      });
+
+      console.log('✅ Issue created:', issue.data.number, issue.data.html_url);
+
+      return {
+        number: issue.data.number,
+        url: issue.data.html_url,
+        title: issue.data.title,
+        assignee: params.assignee
+      };
+    } catch (error: any) {
+      console.error('❌ GitHub API Error:');
+      console.error('   Status:', error.status);
+      console.error('   Message:', error.message);
+      if (error.response?.data) {
+        console.error('   Response:', JSON.stringify(error.response.data, null, 2));
+      }
+      
+      throw new Error(`GitHub API failed: ${error.message}`);
     }
-
-    if (params.component) {
-      labels.push(`component:${params.component}`);
-    }
-
-    const issue = await this.octokit.issues.create({
-      owner: OWNER,
-      repo: REPO,
-      title: params.title,
-      body: params.description,
-      labels
-    });
-
-    return {
-      number: issue.data.number,
-      url: issue.data.html_url,
-      title: issue.data.title,
-      assignee: params.assignee
-    };
   }
 
   /**
