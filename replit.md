@@ -2,7 +2,12 @@
 
 ## Overview
 
-ProofOfInfluence (POI) is a Web3 influence monetization platform developed by ACEE Ventures. The platform enables creators and brands to convert influence into tangible value through $POI tokens, combining a spot trading market, RWA (Real-World Asset) marketplace, and merchant ecosystem. Built on Base blockchain with Uniswap V2 integration for decentralized trading.
+ProofOfInfluence is a Web3 influence monetization platform developed by ACEE Ventures. The platform enables creators and brands to convert influence into real value through the $POI utility token. It combines decentralized finance (DeFi) trading capabilities with real-world asset (RWA) tokenization, creating a comprehensive ecosystem for influence-based commerce.
+
+The platform consists of three core modules:
+- **Spot Trading Market** - Decentralized $POI token trading with DEX/CEX integration
+- **RWA Market** - Real-world asset tokenization (luxury watches, real estate, art)
+- **Creator/Brand Services** - Profile management and influence monetization tools
 
 ## User Preferences
 
@@ -12,136 +17,216 @@ Preferred communication style: Simple, everyday language.
 
 ### Frontend Architecture
 
-**Framework & Tooling**
-- React 18+ with TypeScript for type-safe component development
-- Vite as build tool and development server with hot module replacement
-- Wouter for lightweight client-side routing
-- TailwindCSS for utility-first styling with custom design system
-- shadcn/ui component library (Radix UI primitives) for accessible UI components
+**Technology Stack:**
+- **React 18** with TypeScript for type-safe UI development
+- **Vite** as the build tool and development server
+- **Wouter** for lightweight client-side routing
+- **TanStack Query** (React Query) for server state management
+- **Tailwind CSS** with custom design system based on shadcn/ui components
+- **Wagmi + Reown AppKit** for Web3 wallet integration
 
-**State Management**
-- TanStack Query (React Query) for server state management and data fetching
-- Local React state (useState/useReducer) for UI-specific state
-- No global state management library needed due to React Query's caching
+**Design System:**
+- Mobile-first responsive design with centered hierarchy
+- Gradient-driven visual identity inspired by Rainbow.me and Gradient.page
+- Typography: Inter (primary), JetBrains Mono (technical elements)
+- Consistent spacing primitives (4, 6, 8, 12 units)
+- Dark mode with theme toggling capability
 
-**Design System**
-- Custom Tailwind configuration with dark/light theme support
-- Design tokens defined in CSS variables (HSL color system)
-- Mobile-first responsive design with breakpoints at 768px (md) and 1024px (lg)
-- Gradient-driven visual identity inspired by Rainbow.me and Gradient.page aesthetics
-- Inter font family for primary text, JetBrains Mono for technical elements
+**Component Architecture:**
+- Radix UI primitives for accessible, unstyled components
+- Custom business components in `client/src/components/`
+- Page-level components in `client/src/pages/`
+- Shared utilities and hooks in `client/src/lib/` and `client/src/hooks/`
 
-**Routing Strategy**
-- Public routes (/, /products, /for-creators, etc.) accessible without authentication
-- Protected routes (/app, /app/market, /profile) require authentication
-- Dynamic username routes (/@username) for public profile cards
-- All routes configured in client/src/App.tsx
+**State Management Strategy:**
+- Server state via TanStack Query with automatic caching and refetching
+- Local UI state via React hooks
+- Wallet state via Wagmi hooks (useAccount, useBalance, etc.)
+- Form state via react-hook-form with Zod validation
 
 ### Backend Architecture
 
-**Server Framework**
-- Express.js for RESTful API with TypeScript
-- Session-based authentication using express-session with PostgreSQL store
-- Passport.js with OpenID Connect for Replit Auth integration
+**Technology Stack:**
+- **Express.js** server with TypeScript
+- **Node.js 18+** runtime environment
+- **Drizzle ORM** for database operations
+- **Replit Auth** for Web2 authentication (OAuth/OIDC)
+- **Passport.js** for session management
 
-**API Design**
-- RESTful endpoints organized by feature modules (/api/market, /api/reserve, /api/merchant)
-- Zod schemas for request validation at route level
-- Consistent error handling with HTTP status codes
-- CORS configured for ChatGPT.com origin (Custom GPT integration)
+**API Structure:**
+- RESTful API endpoints organized by domain:
+  - `/api/auth/*` - Authentication and user management
+  - `/api/market/*` - Trading operations (orders, trades, quotes)
+  - `/api/reserve/*` - Reserve pool management (admin only)
+  - `/api/merchant/*` - Merchant product and order management
+  - `/api/wallet/*` - Wallet connection and Web3 integration
+  - `/api/profile/*` - User profile and link management
 
-**Authentication & Authorization**
-- Replit Auth as primary authentication provider (OAuth/OIDC)
+**Authentication Flow:**
+- Dual authentication: Replit OAuth (Web2) + Wallet signatures (Web3)
+- Session-based auth with PostgreSQL session store
 - Role-based access control (user, merchant, admin)
-- Web3 wallet connection as optional secondary auth method
-- Session management with 7-day cookie expiration
+- Development mode bypass with `DEV_MODE_ADMIN=true` for testing
 
-**Role-Based Access Control**
-- Guest: Public pages only
-- Web3 Connected: Basic trading features
-- KYC Verified: Full platform access including withdrawals
-- Merchant: Product management and order processing
-- Admin: Reserve pool management and system configuration
-- Development mode override: DEV_MODE_ADMIN=true grants all users admin access (server-enforced)
+**Access Control Matrix:**
+- **Guest**: Public content only
+- **Web3 Connected**: Trading, staking, basic features
+- **KYC Verified**: All features including withdrawals
+- **Merchant**: Product and order management
+- **Admin**: Reserve pool operations, system management
 
-### Data Storage
+### Database Architecture
 
-**Database**
-- PostgreSQL as primary relational database via Neon serverless
-- Drizzle ORM for type-safe database queries and schema management
-- Schema organized into logical tables: users, profiles, links, transactions, market orders, products, etc.
+**Database Solution:**
+- **PostgreSQL** via Neon serverless database
+- Connection pooling with `@neondatabase/serverless`
+- Schema management via Drizzle Kit migrations
 
-**Schema Design Philosophy**
-- Users table: Authentication and account management (Replit + Web3)
-- Profiles table: Public showcase information (bio, links, social media)
-- Transactional tables: Separate tables for market orders, trades, merchant orders, reserve actions
-- JSONB fields for flexible metadata storage where appropriate
+**Schema Design:**
+- **users** - Authentication data (Replit Auth + wallet addresses)
+- **profiles** - Public profile information (bio, links, avatars)
+- **links** - User-created links with click tracking
+- **transactions** - Payment and financial records
+- **poiTiers** - Membership tier definitions
+- **poiFeeCredits** - User fee credit balances
+- **poiBurnIntents** - Token burn tracking
+- **marketOrders** - DEX/CEX trading orders
+- **marketTrades** - Executed trade records
+- **feesLedger** - Fee collection and distribution tracking
+- **reserveBalances** - Reserve pool asset balances
+- **reserveActions** - Reserve pool operation history
+- **products** - Merchant product catalog
+- **merchantOrders** - E-commerce order records
+- **taxReports** - Tax compliance documentation
+- **sessions** - User session storage (Replit Auth requirement)
 
-**Data Migration**
-- Drizzle Kit for schema migrations (drizzle.config.ts)
-- Migration files stored in /migrations directory
-- Database schema defined in shared/schema.ts
+**Data Relationships:**
+- Users have one profile, multiple links, orders, and transactions
+- Orders link to trades via foreign keys
+- Fee credits connect to users and tiers
+- Products belong to merchants (users with merchant role)
 
-### External Dependencies
+### Web3 Integration
 
-**Blockchain Integration**
-- Wagmi hooks for Web3 wallet interactions (useAccount, useBalance, useSwitchChain)
-- Reown AppKit (formerly WalletConnect) for multi-wallet support
-- Base blockchain (Chain ID: 8453) as primary network, with support for Base Sepolia testnet
-- BaseSwap DEX (Uniswap V2 fork) for token swaps
-- Ethers.js v5 for smart contract interactions and transaction signing
+**Smart Contract Architecture:**
+- **POIToken.sol** - ERC20 token contract (OpenZeppelin-based)
+- Upgradeable contract pattern using OpenZeppelin's UUPS proxy
+- Deployment support for multiple networks (Ethereum, Base, Arbitrum, Polygon)
 
-**Smart Contracts**
-- POI Token: ERC20 standard token with upgradeable pattern (OpenZeppelin)
-- Uniswap V2 Router integration for decentralized swaps
-- Contract deployment via Hardhat (hardhat.config.cjs) or standalone TypeScript scripts
-- Deployments tracked in deployments/ directory as JSON files
+**Blockchain Networks:**
+- Primary: Base (lower fees, EVM-compatible)
+- Supported: Ethereum Mainnet, Base Sepolia (testnet), Arbitrum, Polygon
+- Network switching handled via Wagmi's `useSwitchChain`
 
-**Payment Processing**
-- Stripe for fiat payments (checkout sessions, webhooks)
-- USDC as primary stablecoin for crypto payments on Base
-- Fee credit system for POI token holders (discounts on platform fees only, not item prices)
+**DEX Integration:**
+- Uniswap V2 protocol for token swaps
+- BaseSwap (Uniswap V2 fork) on Base network
+- Smart contract interactions via ethers.js v5 (Uniswap SDK Core compatibility)
+- Quote fetching and swap execution with slippage protection
 
-**Third-Party APIs**
-- GitHub REST API (@octokit/rest) for issue management via Custom GPT
-- Slack API for AI coordination notifications (optional, gracefully degrades if not configured)
-- TradingView widget for real-time price charts
+**Wallet Support:**
+- Featured wallets: MetaMask, Coinbase Wallet, Phantom, Binance Web3, OKX
+- Universal WalletConnect v2 support (300+ wallets)
+- Mobile browser compatibility (Safari, WeChat, Chrome)
 
-**API Server for AI Coordination**
-- Standalone Express server (api-server/) for ChatGPT Custom GPT integration
-- Proxy endpoint in main server (/api-gpt/*) forwards to API server on port 3001
-- Creates GitHub issues with AI agent assignments (@cursor, @codex, @replit labels)
-- Optional Slack notifications to channels (#ai-coordination, #cursor-dev, etc.)
+### Payment Processing
 
-### Deployment & Operations
+**Stripe Integration:**
+- Fiat on-ramp for $POI token purchases
+- Checkout session creation for credit card payments
+- Webhook handling for payment confirmations
+- Payment success/failure routing
 
-**Environment Configuration**
-- Development: Local with Vite dev server and tsx for backend hot reload
-- Production: Vite build → static assets served from dist/public, Express serves API
-- Environment variables managed via .env files (local) or Replit Secrets (production)
+**Fee Structure:**
+- Trading fees: 0.3% (0.1% goes to $POI buyback and burn)
+- Platform fees, authentication fees, custody fees
+- Tier-based fee discounts (POI holders get discounts)
+- Fee credits system (utility use of $POI token)
 
-**Build Process**
-- Frontend: Vite builds React app to dist/public
-- Backend: esbuild bundles server/index.ts to dist/index.js as ESM module
-- Smart Contracts: Hardhat compiles Solidity to artifacts/ directory
+**Compliance:**
+- Fee credits and tier discounts apply ONLY to fees, never to item prices
+- $POI is a utility token, not a security
+- Transparent fee breakdown in checkout flow
 
-**Network Support**
-- Mainnet: Ethereum, Base, Arbitrum, Polygon
-- Testnets: Sepolia, Base Sepolia
-- Default network: Base (production), Base Sepolia (testing)
-- RPC URLs configurable via environment variables or use public endpoints
+## External Dependencies
 
-**Critical Environment Variables**
-- DATABASE_URL: PostgreSQL connection string (required)
-- SESSION_SECRET: Express session encryption key (required)
-- STRIPE_SECRET_KEY / STRIPE_PUBLISHABLE_KEY: Payment processing
-- VITE_WALLETCONNECT_PROJECT_ID: WalletConnect/AppKit integration
-- PRIVATE_KEY: Wallet for smart contract deployment (local development only)
-- GITHUB_TOKEN, API_SECRET_KEY: Custom GPT API server
-- SLACK_BOT_TOKEN: Optional Slack integration
+### Third-Party Services
 
-**Mock vs Real API Mode**
-- Market module: Real API enabled by default (backend complete)
-- Reserve Pool: Mock API default (use VITE_USE_MOCK_RESERVE=false when backend ready)
-- Merchant: Mock API default (use VITE_USE_MOCK_MERCHANT=false when backend ready)
-- Flexible per-module control via environment variables for progressive integration
+**WalletConnect Cloud:**
+- Project ID required for wallet connection
+- Configure at: https://cloud.walletconnect.com/
+- Environment variable: `VITE_WALLETCONNECT_PROJECT_ID`
+
+**Neon Database:**
+- Serverless PostgreSQL hosting
+- Connection string in `DATABASE_URL` environment variable
+- Automatic scaling and connection pooling
+
+**Stripe Payment Gateway:**
+- Secret key: `STRIPE_SECRET_KEY`
+- Publishable key: `STRIPE_PUBLISHABLE_KEY`
+- Webhook endpoint for payment confirmations
+
+**Replit Authentication:**
+- OAuth/OIDC provider for user login
+- Session secret: `SESSION_SECRET`
+- Issuer URL: `https://replit.com/oidc` (configurable via `ISSUER_URL`)
+
+**RPC Providers:**
+- Ethereum/Base/Arbitrum/Polygon nodes
+- Default public RPCs provided, custom URLs configurable
+- Environment variables: `MAINNET_RPC_URL`, `BASE_RPC_URL`, etc.
+
+### AI Collaboration Infrastructure
+
+**API Server (Port 3001):**
+- Standalone Express server for AI task management
+- GitHub Issues API integration for task creation
+- Slack Bot integration for team notifications
+- Custom GPT integration via OpenAI
+
+**GitHub Integration:**
+- Repository: `acee-chase/ProofOfInfluence`
+- Issue labels: `@cursor`, `@codex`, `@replit` for AI assignment
+- Personal access token required: `GITHUB_TOKEN`
+
+**Slack Integration (Optional):**
+- Bot token: `SLACK_BOT_TOKEN`
+- Channels: `#ai-coordination`, `#cursor-dev`, `#codex-contracts`, `#replit-deploy`
+- Real-time task notifications and coordination
+
+### Development Tools
+
+**Build Tools:**
+- Vite for frontend bundling and dev server
+- esbuild for backend compilation
+- TypeScript compiler for type checking
+- Drizzle Kit for database migrations
+
+**Deployment Tools:**
+- Hardhat for smart contract compilation and deployment
+- tsx for TypeScript execution in Node.js
+- Replit for hosting and continuous deployment
+
+**Code Quality:**
+- TypeScript for type safety
+- Zod for runtime validation
+- ESLint and Prettier (configuration not included but recommended)
+
+### Environment Configuration
+
+**Required Environment Variables:**
+- `DATABASE_URL` - Neon PostgreSQL connection string
+- `SESSION_SECRET` - Replit Auth session encryption key
+- `VITE_WALLETCONNECT_PROJECT_ID` - WalletConnect project identifier
+
+**Optional for Production:**
+- `STRIPE_SECRET_KEY`, `STRIPE_PUBLISHABLE_KEY` - Payment processing
+- `PRIVATE_KEY` - Deployer wallet private key (smart contracts)
+- `NETWORK` - Blockchain network for deployment
+- `POI_TOKEN_ADDRESS` - Deployed token contract address
+
+**Development Mode:**
+- `DEV_MODE_ADMIN=true` - Grants all authenticated users admin access
+- `NODE_ENV=development` - Enables dev-only features
+- API server mocking via `VITE_USE_MOCK_*` flags

@@ -87,7 +87,7 @@ app.get('/openapi.yaml', (req, res) => {
 // Protected API endpoints
 app.use('/api', authenticate);
 
-// ✅ In-memory task status tracking (简单版本)
+// Task status tracking for async operations
 const taskStatus = new Map<string, {
   status: 'processing' | 'completed' | 'failed';
   taskId?: string;
@@ -99,7 +99,7 @@ const taskStatus = new Map<string, {
 
 /**
  * POST /api/tasks/create
- * Create a new GitHub Issue for AI task (ASYNC)
+ * Create a new GitHub Issue for AI task (asynchronous)
  * 
  * Returns immediately with 202 Accepted + taskId
  * Processes GitHub + Slack in background
@@ -116,10 +116,10 @@ app.post('/api/tasks/create', async (req, res) => {
       return res.status(400).json({ error: 'assignee must be cursor, codex, or replit' });
     }
 
-    // ✅ 生成任务 ID
+    // Generate unique task ID
     const taskId = `task_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     
-    // ✅ 立即返回 202 Accepted
+    // Store initial status
     taskStatus.set(taskId, {
       status: 'processing',
       taskId,
@@ -128,20 +128,21 @@ app.post('/api/tasks/create', async (req, res) => {
 
     console.log(`📋 Task ${taskId} accepted, processing in background...`);
 
+    // Return 202 Accepted immediately
     res.status(202).json({
       status: 'accepted',
-      message: '任务已接收，正在后台处理',
+      message: 'Task accepted, processing in background',
       taskId,
       statusUrl: `/api/tasks/status/${taskId}`,
-      note: 'GitHub Issue 正在创建中，请稍后查询状态或查看 GitHub'
+      note: 'GitHub Issue is being created, please check status later or view GitHub'
     });
 
-    // ✅ 异步处理（不阻塞响应）
+    // Process asynchronously in background
     setImmediate(async () => {
       try {
         console.log(`🔄 Processing task ${taskId}...`);
         
-        // 创建 GitHub Issue
+        // Create GitHub Issue
         const result = await github.createTask({
           title,
           assignee,
@@ -152,7 +153,7 @@ app.post('/api/tasks/create', async (req, res) => {
 
         console.log(`✅ GitHub Issue #${result.number} created for task ${taskId}`);
 
-        // 更新状态
+        // Update status
         taskStatus.set(taskId, {
           status: 'completed',
           taskId,
@@ -161,7 +162,7 @@ app.post('/api/tasks/create', async (req, res) => {
           createdAt: taskStatus.get(taskId)!.createdAt
         });
 
-        // 发送 Slack 通知（不影响主流程）
+        // Send Slack notification (fire and forget)
         if (slack) {
           try {
             await slack.notifyTaskCreated({
@@ -180,7 +181,7 @@ app.post('/api/tasks/create', async (req, res) => {
       } catch (error: any) {
         console.error(`❌ Task ${taskId} failed:`, error.message);
         
-        // 更新为失败状态
+        // Update to failed status
         taskStatus.set(taskId, {
           status: 'failed',
           taskId,
@@ -318,7 +319,7 @@ app.get('/api/project/status', async (req, res) => {
 
 /**
  * POST /api/slack/task/complete
- * Send task completion notification to Slack
+ * Send task completion notification to Slack (asynchronous)
  */
 app.post('/api/slack/task/complete', async (req, res) => {
   if (!slack) {
@@ -332,27 +333,40 @@ app.post('/api/slack/task/complete', async (req, res) => {
       return res.status(400).json({ error: 'taskId, title, and completedBy are required' });
     }
 
-    await slack.notifyTaskCompleted({
-      taskId,
-      title,
-      completedBy,
-      branch,
-      commit,
-      files,
-      nextAI,
-      nextAction
+    // Return 202 Accepted immediately
+    res.status(202).json({ 
+      success: true, 
+      message: 'Task completion notification queued',
+      taskId 
     });
 
-    res.json({ success: true, message: 'Task completion notification sent' });
+    // Send in background
+    setImmediate(async () => {
+      try {
+        await slack!.notifyTaskCompleted({
+          taskId,
+          title,
+          completedBy,
+          branch,
+          commit,
+          files,
+          nextAI,
+          nextAction
+        });
+        console.log(`✅ Task completion notification sent for #${taskId}`);
+      } catch (error: any) {
+        console.error(`❌ Failed to send task completion notification:`, error.message);
+      }
+    });
   } catch (error: any) {
-    console.error('Error sending Slack notification:', error);
+    console.error('Error queuing Slack notification:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 /**
  * POST /api/slack/task/status
- * Send task status update notification to Slack
+ * Send task status update notification to Slack (asynchronous)
  */
 app.post('/api/slack/task/status', async (req, res) => {
   if (!slack) {
@@ -366,18 +380,31 @@ app.post('/api/slack/task/status', async (req, res) => {
       return res.status(400).json({ error: 'taskId, title, oldStatus, and newStatus are required' });
     }
 
-    await slack.notifyTaskStatusUpdate(taskId, title, oldStatus, newStatus, note);
+    // Return 202 Accepted immediately
+    res.status(202).json({ 
+      success: true, 
+      message: 'Status update notification queued',
+      taskId 
+    });
 
-    res.json({ success: true, message: 'Status update notification sent' });
+    // Send in background
+    setImmediate(async () => {
+      try {
+        await slack!.notifyTaskStatusUpdate(taskId, title, oldStatus, newStatus, note);
+        console.log(`✅ Status update notification sent for #${taskId}`);
+      } catch (error: any) {
+        console.error(`❌ Failed to send status update notification:`, error.message);
+      }
+    });
   } catch (error: any) {
-    console.error('Error sending Slack notification:', error);
+    console.error('Error queuing Slack notification:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 /**
  * POST /api/slack/deployment
- * Send deployment notification to Slack
+ * Send deployment notification to Slack (asynchronous)
  */
 app.post('/api/slack/deployment', async (req, res) => {
   if (!slack) {
@@ -399,26 +426,40 @@ app.post('/api/slack/deployment', async (req, res) => {
       return res.status(400).json({ error: 'status must be started, success, or failed' });
     }
 
-    await slack.notifyDeployment({
+    // Return 202 Accepted immediately
+    res.status(202).json({ 
+      success: true, 
+      message: 'Deployment notification queued',
       environment,
-      branch,
-      commit,
-      status,
-      url,
-      duration,
-      error
+      status 
     });
 
-    res.json({ success: true, message: 'Deployment notification sent' });
+    // Send in background
+    setImmediate(async () => {
+      try {
+        await slack!.notifyDeployment({
+          environment,
+          branch,
+          commit,
+          status,
+          url,
+          duration,
+          error
+        });
+        console.log(`✅ Deployment notification sent (${environment} - ${status})`);
+      } catch (err: any) {
+        console.error(`❌ Failed to send deployment notification:`, err.message);
+      }
+    });
   } catch (err: any) {
-    console.error('Error sending Slack notification:', err);
+    console.error('Error queuing Slack notification:', err);
     res.status(500).json({ error: err.message });
   }
 });
 
 /**
  * POST /api/slack/commit
- * Send commit notification to Slack
+ * Send commit notification to Slack (asynchronous)
  */
 app.post('/api/slack/commit', async (req, res) => {
   if (!slack) {
@@ -432,25 +473,38 @@ app.post('/api/slack/commit', async (req, res) => {
       return res.status(400).json({ error: 'branch, message, author, sha, and url are required' });
     }
 
-    await slack.notifyCommit({
-      branch,
-      message,
-      author,
-      sha,
-      url,
-      filesChanged: filesChanged || 0
+    // Return 202 Accepted immediately
+    res.status(202).json({ 
+      success: true, 
+      message: 'Commit notification queued',
+      sha: sha.substring(0, 7)
     });
 
-    res.json({ success: true, message: 'Commit notification sent' });
+    // Send in background
+    setImmediate(async () => {
+      try {
+        await slack!.notifyCommit({
+          branch,
+          message,
+          author,
+          sha,
+          url,
+          filesChanged: filesChanged || 0
+        });
+        console.log(`✅ Commit notification sent (${sha.substring(0, 7)})`);
+      } catch (error: any) {
+        console.error(`❌ Failed to send commit notification:`, error.message);
+      }
+    });
   } catch (error: any) {
-    console.error('Error sending Slack notification:', error);
+    console.error('Error queuing Slack notification:', error);
     res.status(500).json({ error: error.message });
   }
 });
 
 /**
  * POST /api/slack/message
- * Send a custom message to a Slack channel
+ * Send a custom message to a Slack channel (asynchronous)
  */
 app.post('/api/slack/message', async (req, res) => {
   if (!slack) {
@@ -468,11 +522,26 @@ app.post('/api/slack/message', async (req, res) => {
       return res.status(400).json({ error: 'invalid channel' });
     }
 
-    await slack.sendToChannel(channel, text, blocks);
+    // Return 202 Accepted immediately to avoid client timeout
+    res.status(202).json({ 
+      success: true, 
+      message: 'Slack message queued for delivery',
+      channel,
+      preview: text.substring(0, 50) + (text.length > 50 ? '...' : '')
+    });
 
-    res.json({ success: true, message: 'Message sent to Slack' });
+    // Send message asynchronously in background
+    setImmediate(async () => {
+      try {
+        console.log(`📤 Sending Slack message to #${channel}...`);
+        await slack!.sendToChannel(channel, text, blocks);
+        console.log(`✅ Slack message sent to #${channel}`);
+      } catch (error: any) {
+        console.error(`❌ Failed to send Slack message to #${channel}:`, error.message);
+      }
+    });
   } catch (error: any) {
-    console.error('Error sending Slack message:', error);
+    console.error('Error queuing Slack message:', error);
     res.status(500).json({ error: error.message });
   }
 });
