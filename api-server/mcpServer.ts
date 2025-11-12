@@ -411,6 +411,115 @@ export function createMcpServer({
     },
   );
 
+  server.registerTool(
+    "claim_task",
+    {
+      title: "Claim Task",
+      description: "Claim a specific task and start working on it. Updates status to in-progress and adds a comment.",
+      inputSchema: {
+        taskId: z.number().describe("GitHub issue number to claim"),
+      },
+    },
+    async (args, extra: any) => {
+      const identity = resolveIdentity(undefined, extra);
+      if (!identity) {
+        return toolError("AI identity is required");
+      }
+
+      const result = await tools.claimTask(identity, args.taskId);
+
+      await server.sendLoggingMessage(
+        {
+          level: "info",
+          data: `${identity} claimed task #${args.taskId}`,
+        },
+        extra.sessionId,
+      );
+
+      return textContent(
+        `✅ Claimed task #${result.taskId}: ${result.title}`,
+        result
+      );
+    },
+  );
+
+  server.registerTool(
+    "start_my_work",
+    {
+      title: "Start My Work",
+      description: "Automatically find and claim the first ready task assigned to you. One-click to start working.",
+      inputSchema: {},
+    },
+    async (_args, extra: any) => {
+      const identity = resolveIdentity(undefined, extra);
+      if (!identity) {
+        return toolError("AI identity is required");
+      }
+
+      const result = await tools.startMyWork(identity);
+
+      await server.sendLoggingMessage(
+        {
+          level: "info",
+          data: result.started 
+            ? `${identity} started work on task #${result.task?.taskId}`
+            : `No ready tasks found for ${identity}`,
+        },
+        extra.sessionId,
+      );
+
+      if (!result.started) {
+        return textContent(
+          `ℹ️ No ready tasks found for ${identity}`,
+          result
+        );
+      }
+
+      return textContent(
+        `✅ Started task #${result.task?.taskId}: ${result.task?.title}\n${result.task?.url}`,
+        result
+      );
+    },
+  );
+
+  server.registerTool(
+    "complete_and_handoff",
+    {
+      title: "Complete and Handoff Task",
+      description: "Mark current task as complete and hand off to next AI. Automatically updates status, adds comments, and sends notifications.",
+      inputSchema: {
+        nextAI: aiIdentitySchema.describe("Next AI to handle the task"),
+        taskId: z.number().optional().describe("Task ID (auto-detect current task if not provided)"),
+        message: z.string().optional().describe("Handoff message for next AI"),
+      },
+    },
+    async (args, extra: any) => {
+      const identity = resolveIdentity(undefined, extra);
+      if (!identity) {
+        return toolError("AI identity is required");
+      }
+
+      const result = await tools.completeAndHandoff(identity, {
+        taskId: args.taskId,
+        nextAI: args.nextAI,
+        message: args.message,
+      });
+
+      await server.sendLoggingMessage(
+        {
+          level: "info",
+          data: `${identity} completed task #${result.taskId} and handed off to ${args.nextAI}`,
+        },
+        extra.sessionId,
+      );
+
+      return textContent(
+        `✅ Task #${result.taskId} completed and handed off to ${args.nextAI}\n${result.title}`,
+        result
+      );
+    },
+  );
+
   return server;
 }
 

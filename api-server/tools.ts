@@ -130,6 +130,138 @@ export class CollaborationTools {
   async getProjectStatus() {
     return this.github.getProjectStatus();
   }
+
+  /**
+   * 领取指定任务
+   * 更新状态为 in-progress，添加开始工作的评论
+   */
+  async claimTask(ai: AIIdentity, taskId: number) {
+    // 获取任务详情
+    const task = await this.github.getTask(taskId);
+    
+    // 更新状态为 in-progress
+    await this.github.updateTaskStatus(taskId, "in-progress");
+    
+    // 添加开始工作的评论
+    await this.github.addComment(
+      taskId,
+      `🤖 ${ai.toUpperCase()} AI 开始处理此任务`
+    );
+    
+    // Slack 通知状态变更
+    if (this.slack) {
+      await this.slack.notifyTaskStatusUpdate(
+        taskId.toString(),
+        task.title,
+        "ready",
+        "in-progress",
+        `${ai} 已领取任务`
+      );
+    }
+    
+    return {
+      taskId,
+      title: task.title,
+      status: "in-progress",
+    };
+  }
+
+  /**
+   * 自动查询并开始第一个待处理任务
+   */
+  async startMyWork(ai: AIIdentity) {
+    // 查询状态为 ready 的任务
+    const readyTasks = await this.github.listTasks({
+      assignee: ai,
+      status: "ready",
+      state: "open",
+    });
+
+    if (readyTasks.length === 0) {
+      return {
+        started: false,
+        message: `No ready tasks found for ${ai}`,
+        tasks: [],
+      };
+    }
+
+    // 领取第一个任务
+    const task = readyTasks[0];
+    await this.claimTask(ai, task.number);
+
+    return {
+      started: true,
+      message: `Started task #${task.number}: ${task.title}`,
+      task: {
+        taskId: task.number,
+        title: task.title,
+        url: task.url,
+      },
+    };
+  }
+
+  /**
+   * 完成当前任务并交接给下一个 AI
+   */
+  async completeAndHandoff(
+    ai: AIIdentity,
+    params: {
+      taskId?: number;
+      nextAI: AIIdentity;
+      message?: string;
+    }
+  ) {
+    let taskId = params.taskId;
+
+    // 如果没有指定 taskId，查找当前 in-progress 的任务
+    if (!taskId) {
+      const inProgressTasks = await this.github.listTasks({
+        assignee: ai,
+        status: "in-progress",
+        state: "open",
+      });
+
+      if (inProgressTasks.length === 0) {
+        throw new Error(`No in-progress tasks found for ${ai}`);
+      }
+
+      taskId = inProgressTasks[0].number;
+    }
+
+    // 获取任务详情
+    const task = await this.github.getTask(taskId);
+
+    // 更新状态为 needs-review
+    await this.github.updateTaskStatus(taskId, "needs-review");
+
+    // 添加完成和交接评论
+    const handoffMessage = params.message || "任务完成，请接手处理";
+    await this.github.addComment(
+      taskId,
+      `✅ ${ai.toUpperCase()} 已完成工作\n\n@${params.nextAI} ${handoffMessage}`
+    );
+
+    // 发送 Slack 通知给下一个 AI
+    if (this.slack) {
+      await this.slack.sendToChannel(
+        params.nextAI,
+        `🔔 ${ai} 完成了任务 #${taskId}\n**${task.title}**\n${handoffMessage}\n对我说 "开始工作" 来处理此任务\n${task.url}`
+      );
+
+      // 通知协调频道
+      await this.slack.sendToChannel(
+        "coordination",
+        `🔄 任务交接: ${ai} → ${params.nextAI}\n任务 #${taskId}: ${task.title}`
+      );
+    }
+
+    return {
+      success: true,
+      taskId,
+      title: task.title,
+      handedOffTo: params.nextAI,
+    };
+  }
 }
 
 
