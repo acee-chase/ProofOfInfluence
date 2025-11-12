@@ -11,10 +11,19 @@ const PORT = process.env.API_PORT || 3001;
 
 // Middleware
 app.use(cors({
-  origin: 'https://chatgpt.com',
-  credentials: true
+  origin: [
+    'https://chatgpt.com',           // Custom GPT direct access
+    'http://localhost:5000',         // Local main app proxy
+    'http://localhost:3000',         // Development environment
+    /\.replit\.dev$/,                // All Replit dev domains
+    /\.replit\.app$/                 // Replit production domains
+  ],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+app.use(express.json({ limit: '10mb' }));        // Increase body size limit
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Authentication middleware
 const authenticate = (req: express.Request, res: express.Response, next: express.NextFunction) => {
