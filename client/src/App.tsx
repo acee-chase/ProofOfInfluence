@@ -26,6 +26,7 @@ import Changelog from "@/pages/Changelog";
 import Company from "@/pages/Company";
 import Market from "@/pages/Market";
 import TGE from "@/pages/TGE";
+import EarlyBird from "@/pages/EarlyBird";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -43,6 +44,7 @@ function Router() {
       
       {/* TGE & Campaign Routes */}
       <Route path="/tge" component={TGE} />
+      <Route path="/early-bird" component={EarlyBird} />
       
       {/* Information Architecture Routes */}
       <Route path="/products" component={Products} />

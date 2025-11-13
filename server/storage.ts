@@ -17,6 +17,9 @@ import {
   merchantOrders,
   taxReports,
   tgeEmailSubscriptions,
+  earlyBirdTasks,
+  userEarlyBirdProgress,
+  earlyBirdConfig,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -52,6 +55,12 @@ import {
   type InsertTaxReport,
   type TgeEmailSubscription,
   type InsertTgeEmailSubscription,
+  type EarlyBirdTask,
+  type InsertEarlyBirdTask,
+  type UserEarlyBirdProgress,
+  type InsertUserEarlyBirdProgress,
+  type EarlyBirdConfig,
+  type InsertEarlyBirdConfig,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, or, lte } from "drizzle-orm";
@@ -972,6 +981,123 @@ export class DatabaseStorage implements IStorage {
       })
       .returning();
     return subscription;
+  }
+
+  // Early-Bird Tasks
+  async getEarlyBirdTasks(): Promise<EarlyBirdTask[]> {
+    return await db
+      .select()
+      .from(earlyBirdTasks)
+      .where(eq(earlyBirdTasks.isActive, true))
+      .orderBy(earlyBirdTasks.sortOrder);
+  }
+
+  async createEarlyBirdTask(task: InsertEarlyBirdTask): Promise<EarlyBirdTask> {
+    const [created] = await db.insert(earlyBirdTasks).values(task).returning();
+    return created;
+  }
+
+  // User Early-Bird Progress
+  async getUserEarlyBirdProgress(userId: string): Promise<UserEarlyBirdProgress[]> {
+    return await db
+      .select()
+      .from(userEarlyBirdProgress)
+      .where(eq(userEarlyBirdProgress.userId, userId));
+  }
+
+  async markTaskComplete(userId: string, taskId: string, rewardAmount: number): Promise<UserEarlyBirdProgress> {
+    const [progress] = await db
+      .insert(userEarlyBirdProgress)
+      .values({
+        userId,
+        taskId,
+        completed: true,
+        completedAt: sql`NOW()`,
+        rewardAmount,
+      })
+      .onConflictDoUpdate({
+        target: [userEarlyBirdProgress.userId, userEarlyBirdProgress.taskId],
+        set: {
+          completed: true,
+          completedAt: sql`NOW()`,
+          updatedAt: sql`NOW()`,
+        },
+      })
+      .returning();
+    return progress;
+  }
+
+  // Early-Bird Campaign Stats
+  async getEarlyBirdStats(): Promise<{
+    totalParticipants: number;
+    totalRewardsDistributed: string;
+    config: EarlyBirdConfig | undefined;
+  }> {
+    // Get unique participants count
+    const [participantsResult] = await db
+      .select({ count: sql<number>`COUNT(DISTINCT ${userEarlyBirdProgress.userId})` })
+      .from(userEarlyBirdProgress)
+      .where(eq(userEarlyBirdProgress.completed, true));
+
+    // Get total rewards distributed
+    const [rewardsResult] = await db
+      .select({ total: sql<string>`COALESCE(SUM(${userEarlyBirdProgress.rewardAmount}), '0')` })
+      .from(userEarlyBirdProgress)
+      .where(eq(userEarlyBirdProgress.completed, true));
+
+    // Get active config
+    const [config] = await db
+      .select()
+      .from(earlyBirdConfig)
+      .where(eq(earlyBirdConfig.isActive, true))
+      .orderBy(desc(earlyBirdConfig.createdAt))
+      .limit(1);
+
+    return {
+      totalParticipants: Number(participantsResult?.count ?? 0),
+      totalRewardsDistributed: rewardsResult?.total ?? '0',
+      config,
+    };
+  }
+
+  async getUserEarlyBirdSummary(userId: string): Promise<{
+    totalEarned: number;
+    totalPotential: number;
+    tasksCompleted: number;
+    totalTasks: number;
+  }> {
+    // Get all active tasks
+    const allTasks = await this.getEarlyBirdTasks();
+    const totalTasks = allTasks.length;
+    const totalPotential = allTasks.reduce((sum, task) => sum + task.reward, 0);
+
+    // Get user's completed tasks
+    const userProgress = await this.getUserEarlyBirdProgress(userId);
+    const completedTasks = userProgress.filter(p => p.completed);
+    const tasksCompleted = completedTasks.length;
+    const totalEarned = completedTasks.reduce((sum, p) => sum + p.rewardAmount, 0);
+
+    return {
+      totalEarned,
+      totalPotential,
+      tasksCompleted,
+      totalTasks,
+    };
+  }
+
+  async getEarlyBirdConfig(): Promise<EarlyBirdConfig | undefined> {
+    const [config] = await db
+      .select()
+      .from(earlyBirdConfig)
+      .where(eq(earlyBirdConfig.isActive, true))
+      .orderBy(desc(earlyBirdConfig.createdAt))
+      .limit(1);
+    return config;
+  }
+
+  async createEarlyBirdConfig(config: InsertEarlyBirdConfig): Promise<EarlyBirdConfig> {
+    const [created] = await db.insert(earlyBirdConfig).values(config).returning();
+    return created;
   }
 }
 

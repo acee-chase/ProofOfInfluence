@@ -468,3 +468,57 @@ export const insertTgeEmailSubscriptionSchema = createInsertSchema(tgeEmailSubsc
 
 export type InsertTgeEmailSubscription = z.infer<typeof insertTgeEmailSubscriptionSchema>;
 export type TgeEmailSubscription = typeof tgeEmailSubscriptions.$inferSelect;
+
+// Early-Bird Tasks table - Define available tasks
+export const earlyBirdTasks = pgTable("early_bird_tasks", {
+  id: varchar("id", { length: 100 }).primaryKey(), // e.g., "register_verify_email"
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  reward: integer("reward").notNull(), // POI amount
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEarlyBirdTaskSchema = createInsertSchema(earlyBirdTasks);
+
+export type InsertEarlyBirdTask = z.infer<typeof insertEarlyBirdTaskSchema>;
+export type EarlyBirdTask = typeof earlyBirdTasks.$inferSelect;
+
+// User Early-Bird Task Progress table - Track user completion
+export const userEarlyBirdProgress = pgTable("user_early_bird_progress", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  taskId: varchar("task_id", { length: 100 }).notNull().references(() => earlyBirdTasks.id, { onDelete: "cascade" }),
+  completed: boolean("completed").default(false).notNull(),
+  completedAt: timestamp("completed_at"),
+  claimed: boolean("claimed").default(false).notNull(),
+  claimedAt: timestamp("claimed_at"),
+  rewardAmount: integer("reward_amount").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("user_task_unique").on(table.userId, table.taskId),
+]);
+
+export const insertUserEarlyBirdProgressSchema = createInsertSchema(userEarlyBirdProgress);
+
+export type InsertUserEarlyBirdProgress = z.infer<typeof insertUserEarlyBirdProgressSchema>;
+export type UserEarlyBirdProgress = typeof userEarlyBirdProgress.$inferSelect;
+
+// Early-Bird Campaign Config table
+export const earlyBirdConfig = pgTable("early_bird_config", {
+  id: serial("id").primaryKey(),
+  endDate: timestamp("end_date").notNull(),
+  participantCap: integer("participant_cap"), // Optional: max participants
+  totalRewardPool: varchar("total_reward_pool", { length: 100 }).notNull(), // Total POI allocated
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEarlyBirdConfigSchema = createInsertSchema(earlyBirdConfig);
+
+export type InsertEarlyBirdConfig = z.infer<typeof insertEarlyBirdConfigSchema>;
+export type EarlyBirdConfig = typeof earlyBirdConfig.$inferSelect;

@@ -799,6 +799,90 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Early-Bird Routes
+  // Get campaign statistics
+  app.get("/api/early-bird/stats", async (req, res) => {
+    try {
+      const stats = await storage.getEarlyBirdStats();
+      
+      res.json({
+        totalParticipants: stats.totalParticipants,
+        participantCap: stats.config?.participantCap || null,
+        totalRewardsDistributed: stats.totalRewardsDistributed,
+        totalRewardPool: stats.config?.totalRewardPool || "100000",
+        endDate: stats.config?.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+    } catch (error) {
+      console.error("Error fetching early-bird stats:", error);
+      res.status(500).json({ message: "Failed to fetch campaign stats" });
+    }
+  });
+
+  // Get user's rewards summary (authenticated)
+  app.get("/api/early-bird/user/rewards", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const summary = await storage.getUserEarlyBirdSummary(userId);
+      res.json(summary);
+    } catch (error) {
+      console.error("Error fetching user rewards:", error);
+      res.status(500).json({ message: "Failed to fetch user rewards" });
+    }
+  });
+
+  // Get user's task progress (authenticated)
+  app.get("/api/early-bird/user/progress", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const progress = await storage.getUserEarlyBirdProgress(userId);
+      
+      // Transform to match frontend interface
+      const formattedProgress = progress.map(p => ({
+        taskId: p.taskId,
+        completed: p.completed,
+        completedAt: p.completedAt?.toISOString(),
+        claimed: p.claimed,
+      }));
+      
+      res.json(formattedProgress);
+    } catch (error) {
+      console.error("Error fetching user progress:", error);
+      res.status(500).json({ message: "Failed to fetch user progress" });
+    }
+  });
+
+  // Get all active tasks
+  app.get("/api/early-bird/tasks", async (req, res) => {
+    try {
+      const tasks = await storage.getEarlyBirdTasks();
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      res.status(500).json({ message: "Failed to fetch tasks" });
+    }
+  });
+
+  // Mark a task as complete (authenticated) - for testing/admin
+  app.post("/api/early-bird/user/complete-task", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { taskId, rewardAmount } = req.body;
+      
+      if (!taskId) {
+        return res.status(400).json({ message: "Task ID is required" });
+      }
+      
+      const progress = await storage.markTaskComplete(userId, taskId, rewardAmount || 0);
+      res.json({ 
+        message: "Task marked as complete",
+        progress 
+      });
+    } catch (error) {
+      console.error("Error completing task:", error);
+      res.status(500).json({ message: "Failed to complete task" });
+    }
+  });
+
   const httpServer = createServer(app);
   return httpServer;
 }
