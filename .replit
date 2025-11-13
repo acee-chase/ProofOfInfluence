@@ -11,6 +11,10 @@ build = ["npm", "run", "build"]
 run = ["npm", "run", "start"]
 
 [[ports]]
+localPort = 3001
+externalPort = 5000
+
+[[ports]]
 localPort = 5000
 externalPort = 80
 
@@ -35,6 +39,10 @@ localPort = 41841
 externalPort = 3000
 
 [[ports]]
+localPort = 42381
+externalPort = 5173
+
+[[ports]]
 localPort = 43563
 
 [[ports]]
@@ -43,6 +51,10 @@ externalPort = 4200
 
 [[ports]]
 localPort = 46007
+
+[[ports]]
+localPort = 46053
+externalPort = 3003
 
 [[ports]]
 localPort = 46633
@@ -72,8 +84,11 @@ author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "npm run dev"
+args = "bash start.sh"
 waitForPort = 5000
+
+[workflows.workflow.metadata]
+outputType = "webview"
 
 [agent]
 integrations = ["javascript_mem_db:1.0.0", "javascript_log_in_with_replit:1.0.0", "javascript_stripe:1.0.0"]

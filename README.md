@@ -83,10 +83,80 @@ Visit `http://localhost:5000` to see the app.
 - OpenZeppelin
 - Uniswap V2
 
+## 🤖 AI Collaboration
+
+This project uses a **multi-AI collaboration system** coordinated by ChatGPT:
+
+### Four AI Roles
+
+- **💬 ChatGPT** - Project Manager (task planning & coordination)
+- **🎨 Cursor AI** - Application development (frontend/backend/docs)
+- **📜 Codex AI** - Smart contract development (Solidity/Hardhat)
+- **🚀 Replit AI** - Deployment & operations (testing/staging/production)
+
+### Collaboration Architecture
+
+**ChatGPT Custom GPT + API Server:**
+```
+ChatGPT Custom GPT (Task planning)
+    ↕ REST API
+API Server (Replit:3001)
+    ↕ GitHub API
+GitHub Issues (Task management)
+    ↕ Labels & Notifications
+Cursor / Codex / Replit (Execution)
+```
+
+### How It Works
+
+1. **ChatGPT creates tasks** via Custom GPT Actions
+2. **API Server** creates GitHub Issues with appropriate labels
+3. **AIs monitor** their assigned Issues (`@cursor`, `@codex`, `@replit`)
+4. **AIs execute** tasks and update Issue comments
+5. **ChatGPT monitors** progress and coordinates next steps
+
+**Example interaction:**
+```
+You → ChatGPT Custom GPT:
+"Create 3 tasks for Market module: backend API (Cursor), 
+fee contract (Codex), deploy to testnet (Replit)"
+
+ChatGPT:
+✅ Created Issue #40 for Cursor
+✅ Created Issue #41 for Codex  
+✅ Created Issue #42 for Replit
+
+Later:
+"Check Cursor's progress"
+→ "Cursor has 2 tasks in-progress, 1 completed"
+```
+
+### Setup Custom GPT
+
+**Requirements:**
+- ChatGPT Plus subscription
+- GitHub Personal Access Token
+- Replit deployment
+
+**See**: [Custom GPT Setup Guide](docs/CUSTOM_GPT_SETUP.md)
+
+### For Collaborators
+
+- **Custom GPT Setup**: [docs/CUSTOM_GPT_SETUP.md](docs/CUSTOM_GPT_SETUP.md)
+- **AI Collaboration**: [docs/AI_COLLABORATION_WEBHOOK.md](docs/AI_COLLABORATION_WEBHOOK.md)
+- **Codex Rules**: [.codexrules](.codexrules)
+- **Cursor Rules**: [.cursorrules](.cursorrules)
+- **Git Workflow**: [docs/GIT_WORKFLOW.md](docs/GIT_WORKFLOW.md)
+- **Replit Workflow**: [docs/REPLIT_WORKFLOW.md](docs/REPLIT_WORKFLOW.md)
+
+---
+
 ## 📚 Documentation
 
 - **[Setup Guide](docs/SETUP.md)** - Wallet, payment, and token deployment
 - **[Architecture](docs/ARCHITECTURE.md)** - System design and API specs
+- **[AI Collaboration](docs/AI_COLLABORATION_WEBHOOK.md)** - How AIs work together
+- **[Git Workflow](docs/GIT_WORKFLOW.md)** - Branch strategy and commit conventions
 - **[Environment Variables](docs/ENV_VARIABLES.md)** - Config reference
 - **[Deployment Checklist](docs/DEPLOYMENT_CHECKLIST.md)** - Production deployment
 - **[Design Guidelines](design_guidelines.md)** - UI/UX standards

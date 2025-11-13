@@ -1,4 +1,5 @@
 import express, { type Request, Response, NextFunction } from "express";
+import { createProxyMiddleware } from 'http-proxy-middleware';
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 
@@ -9,6 +10,28 @@ declare module 'http' {
     rawBody: unknown
   }
 }
+
+// Proxy /api-gpt/* requests to the API Server on port 3001
+// IMPORTANT: Must be registered BEFORE body parsers to avoid consuming request stream
+app.use('/api-gpt', createProxyMiddleware({
+  target: 'http://localhost:3001',
+  changeOrigin: true,
+  timeout: 120000,
+  proxyTimeout: 120000,
+  pathRewrite: {
+    '^/api-gpt': ''
+  },
+  on: {
+    proxyReq: (proxyReq: any, req: any, res: any) => {
+      log(`[Proxy] ${req.method} /api-gpt${req.path} -> http://localhost:3001${req.path}`);
+    },
+    error: (err: any, req: any, res: any) => {
+      log(`[Proxy Error] ${err.message}`);
+    }
+  }
+}));
+
+// Body parsers for non-proxied routes
 app.use(express.json({
   verify: (req, _res, buf) => {
     req.rawBody = buf;
@@ -45,6 +68,30 @@ app.use((req, res, next) => {
 
   next();
 });
+
+// Proxy /api-gpt/* requests to the API Server on port 3001
+app.use('/api-gpt', createProxyMiddleware({
+  target: 'http://localhost:3001',
+  changeOrigin: true,
+  pathRewrite: {
+    '^/api-gpt': '' // Remove /api-gpt prefix when forwarding
+  },
+  on: {
+    proxyReq: (proxyReq: any, req: any, res: any) => {
+      log(`[Proxy] ${req.method} /api-gpt${req.path} -> http://localhost:3001${req.path}`);
+    },
+    error: (err: any, req: any, res: any) => {
+      log(`[Proxy Error] ${err.message}`);
+      if (!res.headersSent) {
+        res.writeHead(503, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ 
+          error: 'API Server unavailable', 
+          message: 'The API server is currently not responding. Please ensure it is running on port 3001.' 
+        }));
+      }
+    }
+  }
+}));
 
 (async () => {
   const server = await registerRoutes(app);
