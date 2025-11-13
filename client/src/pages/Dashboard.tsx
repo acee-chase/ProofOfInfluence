@@ -12,6 +12,8 @@ import AddLinkButton from "@/components/AddLinkButton";
 import AnalyticsView from "@/components/AnalyticsView";
 import ReservePoolPanel from "@/components/ReservePoolPanel";
 import MerchantDashboard from "@/components/MerchantDashboard";
+import TaskCenterWidget from "@/components/TaskCenterWidget";
+import RewardsSummaryWidget from "@/components/RewardsSummaryWidget";
 import { useToast } from "@/hooks/use-toast";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import type { Profile, Link, User } from "@shared/schema";
@@ -440,17 +442,26 @@ export default function Dashboard() {
           </TabsList>
 
           <TabsContent value="profile">
-            <div className="max-w-2xl mx-auto">
-              {profileForm && (
-                <ProfileEditor
-                  profile={profileForm}
-                  username={usernameDraft}
-                  onChange={handleProfileChange}
-                  onSave={handleSaveProfile}
-                  canSave={hasProfileChanges}
-                  isSaving={updateProfileMutation.isPending}
-                />
-              )}
+            <div className="max-w-7xl mx-auto space-y-6">
+              {/* Task & Rewards Widgets */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <TaskCenterWidget />
+                <RewardsSummaryWidget />
+              </div>
+
+              {/* Profile Editor */}
+              <div className="max-w-2xl mx-auto">
+                {profileForm && (
+                  <ProfileEditor
+                    profile={profileForm}
+                    username={usernameDraft}
+                    onChange={handleProfileChange}
+                    onSave={handleSaveProfile}
+                    canSave={hasProfileChanges}
+                    isSaving={updateProfileMutation.isPending}
+                  />
+                )}
+              </div>
             </div>
           </TabsContent>
 
