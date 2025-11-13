@@ -83,11 +83,37 @@ export default {
           busy: "rgb(239 68 68)",
           offline: "rgb(156 163 175)",
         },
+        // Cyberpunk neon colors
+        neon: {
+          cyan: '#00f0ff',
+          purple: '#b620e0',
+          pink: '#ff006e',
+          green: '#00ff88',
+          yellow: '#ffea00',
+          red: '#ff0055',
+        },
+        // Roblox vibrant colors
+        roblox: {
+          blue: '#0066ff',
+          green: '#00cc66',
+          yellow: '#ffcc00',
+          red: '#ff3366',
+          purple: '#9933ff',
+          orange: '#ff6600',
+          pink: '#ff66cc',
+          cyan: '#00ccff',
+        },
       },
       fontFamily: {
         sans: ["var(--font-sans)"],
         serif: ["var(--font-serif)"],
         mono: ["var(--font-mono)"],
+        // Cyberpunk fonts
+        orbitron: ['"Orbitron"', 'sans-serif'],
+        rajdhani: ['"Rajdhani"', 'sans-serif'],
+        // Roblox fonts
+        fredoka: ['"Fredoka"', 'sans-serif'],
+        poppins: ['"Poppins"', 'sans-serif'],
       },
       keyframes: {
         "accordion-down": {
@@ -98,10 +124,64 @@ export default {
           from: { height: "var(--radix-accordion-content-height)" },
           to: { height: "0" },
         },
+        // Cyberpunk animations
+        "matrix-scroll": {
+          '0%': { transform: 'translateY(0)' },
+          '100%': { transform: 'translateY(-100%)' },
+        },
+        "neon-pulse": {
+          '0%, 100%': { opacity: '1', filter: 'drop-shadow(0 0 20px currentColor)' },
+          '50%': { opacity: '0.8', filter: 'drop-shadow(0 0 40px currentColor)' },
+        },
+        "scan-line": {
+          '0%': { transform: 'translateY(-100%)' },
+          '100%': { transform: 'translateY(100vh)' },
+        },
+        glitch: {
+          '0%': { transform: 'translate(0)' },
+          '20%': { transform: 'translate(-2px, 2px)' },
+          '40%': { transform: 'translate(-2px, -2px)' },
+          '60%': { transform: 'translate(2px, 2px)' },
+          '80%': { transform: 'translate(2px, -2px)' },
+          '100%': { transform: 'translate(0)' },
+        },
+        // Roblox animations
+        "bounce-click": {
+          '0%, 100%': { transform: 'scale(1)' },
+          '50%': { transform: 'scale(0.95)' },
+        },
+        "pop-in": {
+          '0%': { transform: 'scale(0)', opacity: '0' },
+          '100%': { transform: 'scale(1)', opacity: '1' },
+        },
+        wiggle: {
+          '0%, 100%': { transform: 'rotate(0deg)' },
+          '25%': { transform: 'rotate(-5deg)' },
+          '75%': { transform: 'rotate(5deg)' },
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% center' },
+          '100%': { backgroundPosition: '200% center' },
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-10px)' },
+        },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        // Cyberpunk
+        "matrix-scroll": "matrix-scroll 20s linear infinite",
+        "neon-pulse": "neon-pulse 2s ease-in-out infinite",
+        "scan-line": "scan-line 8s linear infinite",
+        "glitch": "glitch 0.3s cubic-bezier(.25, .46, .45, .94) both",
+        // Roblox
+        "bounce-click": "bounce-click 0.3s ease-in-out",
+        "pop-in": "pop-in 0.4s cubic-bezier(0.68, -0.55, 0.265, 1.55)",
+        "wiggle": "wiggle 0.5s ease-in-out",
+        "shimmer": "shimmer 2s linear infinite",
+        "float": "float 3s ease-in-out infinite",
       },
     },
   },

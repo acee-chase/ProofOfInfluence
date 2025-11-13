@@ -29,6 +29,9 @@ import TGE from "@/pages/TGE";
 import EarlyBird from "@/pages/EarlyBird";
 import Referral from "@/pages/Referral";
 import Airdrop from "@/pages/Airdrop";
+import Solutions from "@/pages/Solutions";
+import Token from "@/pages/Token";
+import About from "@/pages/About";
 import NotFound from "@/pages/not-found";
 
 function Router() {
@@ -50,21 +53,24 @@ function Router() {
       <Route path="/referral" component={Referral} />
       <Route path="/airdrop" component={Airdrop} />
       
-      {/* Information Architecture Routes */}
-      <Route path="/products" component={Products} />
-      <Route path="/for-creators" component={ForCreators} />
-      <Route path="/for-brands" component={ForBrands} />
+      {/* New Consolidated Routes */}
+      <Route path="/solutions" component={Solutions} />
+      <Route path="/token" component={Token} />
+      <Route path="/about" component={About} />
       <Route path="/use-cases" component={UseCases} />
-      <Route path="/token-docs" component={TokenDocs} />
-      <Route path="/compliance" component={Compliance} />
-      <Route path="/changelog" component={Changelog} />
-      <Route path="/company" component={Company} />
       
-      {/* Legacy Routes (keep for backwards compatibility) */}
-      <Route path="/whitepaper" component={Whitepaper} />
-      <Route path="/services" component={Services} />
-      <Route path="/tokenomics" component={Tokenomics} />
-      <Route path="/roadmap" component={Roadmap} />
+      {/* Redirects - Old Routes to New Consolidated Pages */}
+      <Route path="/products">{() => { window.location.href = "/solutions"; return null; }}</Route>
+      <Route path="/for-creators">{() => { window.location.href = "/solutions"; return null; }}</Route>
+      <Route path="/for-brands">{() => { window.location.href = "/solutions"; return null; }}</Route>
+      <Route path="/token-docs">{() => { window.location.href = "/token"; return null; }}</Route>
+      <Route path="/whitepaper">{() => { window.location.href = "/token"; return null; }}</Route>
+      <Route path="/tokenomics">{() => { window.location.href = "/token"; return null; }}</Route>
+      <Route path="/services">{() => { window.location.href = "/token"; return null; }}</Route>
+      <Route path="/roadmap">{() => { window.location.href = "/token"; return null; }}</Route>
+      <Route path="/company">{() => { window.location.href = "/about"; return null; }}</Route>
+      <Route path="/compliance">{() => { window.location.href = "/about"; return null; }}</Route>
+      <Route path="/changelog">{() => { window.location.href = "/about"; return null; }}</Route>
       
       {/* App & Dashboard - New Structure */}
       <Route path="/app" component={Dashboard} />

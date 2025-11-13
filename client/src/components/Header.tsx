@@ -38,21 +38,20 @@ export default function Header({ lang = "zh" }: HeaderProps) {
   // Resources dropdown items
   const resourceItems = lang === "zh"
     ? [
-        { label: "创作者专区", href: "/for-creators" },
-        { label: "品牌专区", href: "/for-brands" },
+        { label: "解决方案", href: "/solutions" },
         { label: "应用案例", href: "/use-cases" },
-        { label: "Token & 文档", href: "/token-docs" },
-        { label: "合规", href: "/compliance" },
-        { label: "更新日志", href: "/changelog" },
-        { label: "公司", href: "/company" },
+        { label: "Token 文档", href: "/token" },
+        { label: "关于我们", href: "/about" },
+        { label: "TGE 启动", href: "/tge" },
+        { label: "早鸟空投", href: "/early-bird" },
       ]
     : [
-        { label: "For Creators", href: "/for-creators" },
-        { label: "For Brands", href: "/for-brands" },
+        { label: "Solutions", href: "/solutions" },
         { label: "Use Cases", href: "/use-cases" },
-        { label: "Token & Docs", href: "/token-docs" },
-        { label: "Compliance", href: "/compliance" },
-        { label: "Changelog", href: "/changelog" },
+        { label: "Token Docs", href: "/token" },
+        { label: "About Us", href: "/about" },
+        { label: "TGE Launch", href: "/tge" },
+        { label: "Early-Bird", href: "/early-bird" },
         { label: "Company", href: "/company" },
       ];
 
