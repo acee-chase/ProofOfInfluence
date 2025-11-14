@@ -1,505 +1,336 @@
-import { useEffect, useMemo, useState } from "react";
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Save, Eye, LogOut } from "lucide-react";
-import WalletConnectButton from "@/components/WalletConnectButton";
-import ThemeToggle from "@/components/ThemeToggle";
-import ProfileEditor from "@/components/ProfileEditor";
-import LinkEditor, { type LinkEditorData } from "@/components/LinkEditor";
-import AddLinkButton from "@/components/AddLinkButton";
-import AnalyticsView from "@/components/AnalyticsView";
-import ReservePoolPanel from "@/components/ReservePoolPanel";
-import MerchantDashboard from "@/components/MerchantDashboard";
-import { useToast } from "@/hooks/use-toast";
-import { queryClient, apiRequest } from "@/lib/queryClient";
-import type { Profile, Link, User } from "@shared/schema";
+import React from "react";
+import { useQuery } from "@tanstack/react-query";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { Section } from "@/components/layout/Section";
+import { ThemedCard, ThemedButton } from "@/components/themed";
+import { useTheme } from "@/contexts/ThemeContext";
+import { cn } from "@/lib/utils";
+import { Link } from "wouter";
+import {
+  Wallet,
+  TrendingUp,
+  Star,
+  BarChart3,
+  ArrowUpRight,
+  ArrowDownRight,
+  Activity,
+  DollarSign,
+  CheckCircle2,
+} from "lucide-react";
+import type { User } from "@shared/schema";
 
 export default function Dashboard() {
-  const { toast } = useToast();
-  const [profileForm, setProfileForm] = useState<Profile | null>(null);
-  const [usernameDraft, setUsernameDraft] = useState("");
-  const [linksForm, setLinksForm] = useState<LinkEditorData[]>([]);
-  const [linksToDelete, setLinksToDelete] = useState<string[]>([]);
+  const { theme } = useTheme();
 
+  // Fetch user data (keeping existing API integration)
   const { data: user, isLoading: userLoading } = useQuery<User>({
     queryKey: ["/api/auth/user"],
   });
 
-  const { data: profile, isLoading: profileLoading } = useQuery<Profile>({
-    queryKey: ["/api/profile"],
-    enabled: !!user,
-  });
-
-  const { data: links = [], isLoading: linksLoading } = useQuery<Link[]>({
-    queryKey: ["/api/links"],
-    enabled: !!user,
-  });
-
-  const { data: analytics } = useQuery<{
-    totalClicks: number;
-    totalViews: number;
-    topLinks: Array<{ title: string; clicks: number }>;
-  }>({
-    queryKey: ["/api/analytics"],
-    enabled: !!user,
-  });
-
-  useEffect(() => {
-    if (profile) {
-      setProfileForm(profile);
-    }
-  }, [profile]);
-
-  useEffect(() => {
-    setUsernameDraft(user?.username || "");
-  }, [user?.username]);
-
-  useEffect(() => {
-    const mappedLinks = links.map(link => ({
-      id: link.id,
-      title: link.title,
-      url: link.url,
-      visible: link.visible,
-      clicks: link.clicks,
-      position: link.position,
-      isNew: false,
-      isDirty: false,
-    }));
-    setLinksForm(mappedLinks);
-    setLinksToDelete([]);
-  }, [links]);
-
-  const updateProfileMutation = useMutation({
-    mutationFn: async (data: Partial<Profile> & { username?: string }) => {
-      const res = await apiRequest("PATCH", "/api/profile", data);
-      return res.json();
-    },
-    onSuccess: (_, variables) => {
-      const { username: updatedUsername, ...profileUpdates } = variables;
-
-      if (Object.keys(profileUpdates).length > 0) {
-        queryClient.setQueryData<Profile | undefined>(["/api/profile"], (prev) =>
-          prev ? { ...prev, ...profileUpdates } : prev,
-        );
-      }
-
-      if (updatedUsername !== undefined) {
-        queryClient.setQueryData<User | undefined>(["/api/auth/user"], (prev) =>
-          prev ? { ...prev, username: updatedUsername || null } : prev,
-        );
-      }
-
-      queryClient.invalidateQueries({ queryKey: ["/api/profile"] });
-      if (updatedUsername !== undefined) {
-        queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
-      }
-
-      toast({
-        title: "Profile updated",
-        description: "Your changes have been saved",
-      });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to update profile",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const saveLinksMutation = useMutation({
-    mutationFn: async (
-      payload: {
-        toCreate: LinkEditorData[];
-        toUpdate: LinkEditorData[];
-        toDelete: string[];
-      },
-    ) => {
-      const requests: Promise<unknown>[] = [];
-
-      payload.toCreate.forEach((link) => {
-        requests.push(
-          apiRequest("POST", "/api/links", {
-            title: link.title,
-            url: link.url,
-            position: link.position ?? 0,
-            visible: link.visible,
-          }).then((res) => res.json()),
-        );
-      });
-
-      payload.toUpdate.forEach((link) => {
-        const updateData: Partial<Link> = {
-          title: link.title,
-          url: link.url,
-          visible: link.visible,
-          position: link.position,
-        };
-        requests.push(apiRequest("PATCH", `/api/links/${link.id}`, updateData).then((res) => res.json()));
-      });
-
-      payload.toDelete.forEach((id) => {
-        requests.push(apiRequest("DELETE", `/api/links/${id}`));
-      });
-
-      await Promise.all(requests);
-    },
-    onSuccess: (_, variables) => {
-      toast({
-        title: "Links updated",
-        description: "Your link changes have been saved",
-      });
-
-      queryClient.setQueryData<Link[] | undefined>(["/api/links"], (prev) => {
-        if (!prev) return prev;
-
-        let updated = prev.filter((link) => !variables.toDelete.includes(link.id));
-
-        updated = updated.map((link) => {
-          const changed = variables.toUpdate.find((item) => item.id === link.id);
-          if (changed) {
-            return {
-              ...link,
-              title: changed.title,
-              url: changed.url,
-              visible: changed.visible,
-              position: changed.position ?? link.position,
-            };
-          }
-          return link;
-        });
-
-        return updated;
-      });
-
-      setLinksToDelete([]);
-      setLinksForm((prev) =>
-        prev
-          .filter((link) => !variables.toDelete.includes(link.id))
-          .map((link, index) => ({ ...link, position: index, isNew: false, isDirty: false })),
-      );
-
-      queryClient.invalidateQueries({ queryKey: ["/api/links"] });
-    },
-    onError: () => {
-      toast({
-        title: "Error",
-        description: "Failed to save link changes",
-        variant: "destructive",
-      });
-    },
-  });
-
-  const handleLogout = () => {
-    window.location.href = "/api/logout";
+  // Mock data for demonstration
+  const stats = {
+    totalBalance: "$128,431",
+    pnl24h: "+$1,230",
+    pnlPercentage: "+2.4%",
+    xpLevel: 4,
+    trend: "up" as const,
   };
 
-  const handlePreview = () => {
-    const hasUnsavedChanges = hasProfileChanges || hasLinkChanges;
-    if (hasUnsavedChanges) {
-      toast({
-        title: "Save required",
-        description: "Please save your changes before previewing",
-        variant: "destructive",
-      });
-      return;
-    }
+  const recentActivities = [
+    { action: "Staked POI", amount: "1,000 POI", time: "2 hours ago", type: "stake" },
+    { action: "Claimed Rewards", amount: "+50 POI", time: "5 hours ago", type: "reward" },
+    { action: "Referral Bonus", amount: "+25 POI", time: "1 day ago", type: "bonus" },
+  ];
 
-    if (user?.username) {
-      window.open(`/${user.username}`, "_blank");
-    } else {
-      toast({
-        title: "Username required",
-        description: "Please set a username first",
-        variant: "destructive",
-      });
-    }
-  };
+  const tasks = [
+    { id: 1, label: "每日签到", reward: "+5 XP", completed: true },
+    { id: 2, label: "完成充值", reward: "+30 XP", completed: false },
+    { id: 3, label: "邀请 1 位好友", reward: "+20 XP", completed: false },
+  ];
 
-  const handleAddLink = () => {
-    const nextPosition = linksForm.length > 0 ? Math.max(...linksForm.map(link => link.position ?? 0)) + 1 : 0;
-    const tempId = `temp-${Date.now()}`;
-
-    setLinksForm((prev) => ([
-      ...prev,
-      {
-        id: tempId,
-        title: "New Link",
-        url: "https://",
-        visible: true,
-        clicks: 0,
-        position: nextPosition,
-        isNew: true,
-        isDirty: true,
-      },
-    ]));
-  };
-
-  const handleUpdateLink = (id: string, updates: Partial<LinkEditorData>) => {
-    setLinksForm((prev) =>
-      prev.map((link) =>
-        link.id === id
-          ? {
-              ...link,
-              ...updates,
-              isDirty: link.isNew
-                ? true
-                : (() => {
-                    const original = links.find((item) => item.id === id);
-                    if (!original) return true;
-                    return (
-                      (updates.title ?? link.title) !== original.title ||
-                      (updates.url ?? link.url) !== original.url ||
-                      (updates.visible ?? link.visible) !== original.visible
-                    );
-                  })(),
-            }
-          : link,
-      ),
-    );
-  };
-
-  const handleDeleteLink = (id: string) => {
-    setLinksForm((prev) => {
-      const target = prev.find((link) => link.id === id);
-      if (target && !target.isNew) {
-        setLinksToDelete((prevDelete) => (prevDelete.includes(id) ? prevDelete : [...prevDelete, id]));
-      }
-      return prev.filter((link) => link.id !== id);
-    });
-  };
-
-  const handleProfileChange = (updates: Partial<Profile> & { username?: string }) => {
-    const { username: usernameUpdate, ...profileUpdates } = updates;
-
-    if (Object.keys(profileUpdates).length > 0) {
-      setProfileForm((prev) => (prev ? { ...prev, ...profileUpdates } : prev));
-    }
-
-    if (usernameUpdate !== undefined) {
-      setUsernameDraft(usernameUpdate);
-    }
-  };
-
-  const handleSaveProfile = () => {
-    if (!profile || !profileForm) return;
-
-    const updates: Partial<Profile> & { username?: string } = {};
-
-    if (profileForm.name !== profile.name) {
-      updates.name = profileForm.name;
-    }
-
-    if ((profileForm.bio ?? null) !== (profile.bio ?? null)) {
-      updates.bio = profileForm.bio ?? null;
-    }
-
-    if ((profileForm.avatarUrl ?? null) !== (profile.avatarUrl ?? null)) {
-      updates.avatarUrl = profileForm.avatarUrl ?? null;
-    }
-
-    if ((profileForm.googleUrl ?? null) !== (profile.googleUrl ?? null)) {
-      updates.googleUrl = profileForm.googleUrl ?? null;
-    }
-
-    if ((profileForm.twitterUrl ?? null) !== (profile.twitterUrl ?? null)) {
-      updates.twitterUrl = profileForm.twitterUrl ?? null;
-    }
-
-    if ((profileForm.weiboUrl ?? null) !== (profile.weiboUrl ?? null)) {
-      updates.weiboUrl = profileForm.weiboUrl ?? null;
-    }
-
-    if ((profileForm.tiktokUrl ?? null) !== (profile.tiktokUrl ?? null)) {
-      updates.tiktokUrl = profileForm.tiktokUrl ?? null;
-    }
-
-    if ((profileForm.isPublic ?? null) !== (profile.isPublic ?? null)) {
-      updates.isPublic = profileForm.isPublic;
-    }
-
-    if (usernameDraft !== (user?.username || "")) {
-      updates.username = usernameDraft || undefined;
-    }
-
-    if (Object.keys(updates).length === 0) {
-      return;
-    }
-
-    updateProfileMutation.mutate(updates);
-  };
-
-  const handleSaveLinks = () => {
-    const orderedLinks = linksForm.map((link, index) => ({ ...link, position: index }));
-    const toCreate = orderedLinks.filter((link) => link.isNew);
-    const toUpdate = orderedLinks.filter((link) => !link.isNew && link.isDirty);
-    const toDelete = linksToDelete;
-
-    if (toCreate.length === 0 && toUpdate.length === 0 && toDelete.length === 0) {
-      return;
-    }
-
-    saveLinksMutation.mutate({ toCreate, toUpdate, toDelete });
-  };
-
-  const isLoading = userLoading || profileLoading || linksLoading;
-
-  const hasProfileChanges = useMemo(() => {
-    if (!profile || !profileForm) return false;
-
-    const usernameChanged = usernameDraft !== (user?.username || "");
-
-    const fieldChanged = <K extends keyof Profile>(key: K) => (profileForm[key] ?? null) !== (profile[key] ?? null);
-
+  if (userLoading) {
     return (
-      fieldChanged("name") ||
-      fieldChanged("bio") ||
-      fieldChanged("avatarUrl") ||
-      fieldChanged("googleUrl") ||
-      fieldChanged("twitterUrl") ||
-      fieldChanged("weiboUrl") ||
-      fieldChanged("tiktokUrl") ||
-      fieldChanged("isPublic") ||
-      usernameChanged
-    );
-  }, [profile, profileForm, usernameDraft, user?.username]);
-
-  const hasLinkChanges = useMemo(() => {
-    if (linksToDelete.length > 0) {
-      return true;
-    }
-
-    return linksForm.some((link) => link.isNew || link.isDirty);
-  }, [linksForm, linksToDelete]);
-
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-background">
-        <header className="border-b">
-          <div className="max-w-7xl mx-auto px-4 py-3">
-            <Skeleton className="h-8 w-48" />
-          </div>
-        </header>
-        <div className="max-w-7xl mx-auto px-4 py-8 space-y-4">
-          <Skeleton className="h-12 w-full max-w-md" />
-          <Skeleton className="h-64 w-full max-w-2xl" />
-        </div>
-      </div>
+      <PageLayout>
+        <Section>
+          <div className="text-center py-12">Loading...</div>
+        </Section>
+      </PageLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b sticky top-0 bg-background/95 backdrop-blur z-10">
-        <div className="max-w-7xl mx-auto px-4 py-3 flex items-center justify-between gap-4">
-          <h1 className="text-xl font-bold">projectX</h1>
-          <div className="flex items-center gap-2">
-            <Button
-              variant="outline"
-              onClick={handlePreview}
-              data-testid="button-preview"
-              disabled={hasProfileChanges || hasLinkChanges}
-            >
-              <Eye className="mr-2 h-4 w-4" />
-              Preview
-            </Button>
-            <WalletConnectButton />
-            <ThemeToggle />
-            <Button
-              variant="ghost"
-              onClick={handleLogout}
-              data-testid="button-logout"
-            >
-              <LogOut className="h-4 w-4" />
-            </Button>
+    <PageLayout>
+      {/* Welcome Section */}
+      <Section>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h1 className={cn(
+              'text-2xl font-bold',
+              theme === 'cyberpunk' ? 'font-orbitron text-cyan-100' : 'font-fredoka text-slate-900'
+            )}>
+              Welcome back{user?.username ? `, ${user.username}` : ''}!
+            </h1>
+            <p className="text-sm opacity-70 mt-1">
+              {theme === 'cyberpunk' ? 'LIVE • Trading Dashboard' : 'Your Dashboard Overview'}
+            </p>
           </div>
+          <Link href="/app/market">
+            <ThemedButton emphasis>
+              Go to Market
+            </ThemedButton>
+          </Link>
         </div>
-      </header>
 
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <Tabs defaultValue="profile" className="w-full">
-          <TabsList className="mb-6">
-            <TabsTrigger value="profile" data-testid="tab-profile">
-              Profile
-            </TabsTrigger>
-            <TabsTrigger value="links" data-testid="tab-links">
-              Links
-            </TabsTrigger>
-            <TabsTrigger value="analytics" data-testid="tab-analytics">
-              Analytics
-            </TabsTrigger>
-            <TabsTrigger value="reserve-pool" data-testid="tab-reserve-pool">
-              Reserve Pool
-            </TabsTrigger>
-            <TabsTrigger value="merchant" data-testid="tab-merchant">
-              Merchant
-            </TabsTrigger>
-          </TabsList>
+        {/* Stats Cards */}
+        <div className="grid gap-4 md:grid-cols-3">
+          <ThemedCard hover className="p-5">
+            <div className="flex items-start justify-between mb-3">
+              <Wallet className={cn(
+                'w-8 h-8',
+                theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
+              )} />
+              <DollarSign className={cn(
+                'w-5 h-5',
+                theme === 'cyberpunk' ? 'text-slate-600' : 'text-slate-400'
+              )} />
+            </div>
+            <div className="text-sm opacity-70 mb-1">Total Balance</div>
+            <div className={cn(
+              'text-2xl font-bold',
+              theme === 'cyberpunk' ? 'font-orbitron text-cyan-300' : 'font-poppins text-blue-600'
+            )}>
+              {stats.totalBalance}
+            </div>
+          </ThemedCard>
 
-          <TabsContent value="profile">
-            <div className="max-w-2xl mx-auto">
-              {profileForm && (
-                <ProfileEditor
-                  profile={profileForm}
-                  username={usernameDraft}
-                  onChange={handleProfileChange}
-                  onSave={handleSaveProfile}
-                  canSave={hasProfileChanges}
-                  isSaving={updateProfileMutation.isPending}
-                />
+          <ThemedCard hover className="p-5">
+            <div className="flex items-start justify-between mb-3">
+              <TrendingUp className={cn(
+                'w-8 h-8',
+                theme === 'cyberpunk' ? 'text-pink-400' : 'text-green-600'
+              )} />
+              {stats.trend === 'up' ? (
+                <ArrowUpRight className="w-5 h-5 text-green-500" />
+              ) : (
+                <ArrowDownRight className="w-5 h-5 text-red-500" />
               )}
             </div>
-          </TabsContent>
-
-          <TabsContent value="links" className="space-y-4">
-            <div className="flex justify-end">
-              <Button
-                onClick={handleSaveLinks}
-                disabled={!hasLinkChanges || saveLinksMutation.isPending}
-                data-testid="button-save-links"
-              >
-                <Save className="mr-2 h-4 w-4" />
-                Save Link Changes
-              </Button>
+            <div className="text-sm opacity-70 mb-1">24h PnL</div>
+            <div className={cn(
+              'text-2xl font-bold',
+              stats.trend === 'up' ? 'text-green-500' : 'text-red-500'
+            )}>
+              {stats.pnl24h}
             </div>
-            <div className="max-w-2xl mx-auto space-y-4">
-              {linksForm.map((link) => (
-                <LinkEditor
-                  key={link.id}
-                  link={link}
-                  onUpdate={handleUpdateLink}
-                  onDelete={handleDeleteLink}
-                  disabled={saveLinksMutation.isPending}
-                />
+            <div className="text-xs opacity-70 mt-1">{stats.pnlPercentage}</div>
+          </ThemedCard>
+
+          <ThemedCard hover className="p-5">
+            <div className="flex items-start justify-between mb-3">
+              <Star className={cn(
+                'w-8 h-8',
+                theme === 'cyberpunk' ? 'text-purple-400' : 'text-purple-600'
+              )} />
+              <Activity className={cn(
+                'w-5 h-5',
+                theme === 'cyberpunk' ? 'text-slate-600' : 'text-slate-400'
+              )} />
+            </div>
+            <div className="text-sm opacity-70 mb-1">XP Level</div>
+            <div className={cn(
+              'text-2xl font-bold',
+              theme === 'cyberpunk' ? 'font-orbitron text-purple-300' : 'font-poppins text-purple-600'
+            )}>
+              Lv. {stats.xpLevel}
+            </div>
+          </ThemedCard>
+        </div>
+      </Section>
+
+      {/* Main Content Grid */}
+      <Section>
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Assets Chart */}
+          <ThemedCard className="lg:col-span-2 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className={cn(
+                'text-lg font-bold',
+                theme === 'cyberpunk' ? 'font-rajdhani text-cyan-200' : 'font-poppins text-slate-900'
+              )}>
+                Assets Overview
+              </h3>
+              <BarChart3 className={cn(
+                'w-5 h-5',
+                theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
+              )} />
+            </div>
+
+            {/* Placeholder for chart */}
+            <div className={cn(
+              'h-48 rounded-lg flex items-center justify-center',
+              theme === 'cyberpunk'
+                ? 'bg-slate-900/60 border border-cyan-400/20'
+                : 'bg-slate-50 border border-slate-200'
+            )}>
+              <div className="text-center">
+                <BarChart3 className={cn(
+                  'w-12 h-12 mx-auto mb-2 opacity-50',
+                  theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
+                )} />
+                <div className="text-sm opacity-70">
+                  Chart visualization will be displayed here
+                </div>
+              </div>
+            </div>
+
+            {/* Quick Actions */}
+            <div className="mt-4 flex gap-2">
+              <Link href="/app/recharge">
+                <ThemedButton size="sm">Deposit</ThemedButton>
+              </Link>
+              <ThemedButton size="sm" variant="outline">Withdraw</ThemedButton>
+              <Link href="/app/market">
+                <ThemedButton size="sm" variant="outline">Trade</ThemedButton>
+              </Link>
+            </div>
+          </ThemedCard>
+
+          {/* Today's Tasks */}
+          <ThemedCard className="p-6">
+            <h3 className={cn(
+              'text-lg font-bold mb-4',
+              theme === 'cyberpunk' ? 'font-rajdhani text-cyan-200' : 'font-poppins text-slate-900'
+            )}>
+              Today's Tasks
+            </h3>
+
+            <div className="space-y-3">
+              {tasks.map((task) => (
+                <div
+                  key={task.id}
+                  className={cn(
+                    'flex items-center justify-between p-3 rounded-lg',
+                    theme === 'cyberpunk'
+                      ? 'bg-slate-900/60 border border-cyan-400/10'
+                      : 'bg-slate-50 border border-slate-100'
+                  )}
+                >
+                  <div className="flex items-center gap-2">
+                    {task.completed ? (
+                      <CheckCircle2 className={cn(
+                        'w-5 h-5',
+                        theme === 'cyberpunk' ? 'text-green-400' : 'text-green-600'
+                      )} />
+                    ) : (
+                      <div className={cn(
+                        'w-5 h-5 rounded-full border-2',
+                        theme === 'cyberpunk' ? 'border-cyan-400/40' : 'border-slate-300'
+                      )} />
+                    )}
+                    <div>
+                      <div className={cn(
+                        'text-sm font-medium',
+                        task.completed && 'line-through opacity-60'
+                      )}>
+                        {task.label}
+                      </div>
+                      <div className="text-xs opacity-70">{task.reward}</div>
+                    </div>
+                  </div>
+                </div>
               ))}
-              <AddLinkButton onClick={handleAddLink} disabled={saveLinksMutation.isPending} />
             </div>
-          </TabsContent>
 
-          <TabsContent value="analytics">
-            <div className="max-w-2xl mx-auto">
-              {analytics && (
-                <AnalyticsView
-                  totalClicks={analytics.totalClicks}
-                  totalViews={analytics.totalViews}
-                  topLinks={analytics.topLinks}
-                />
-              )}
-            </div>
-          </TabsContent>
+            <Link href="/airdrop">
+              <ThemedButton className="w-full mt-4" variant="outline">
+                View All Tasks
+              </ThemedButton>
+            </Link>
+          </ThemedCard>
+        </div>
+      </Section>
 
-          <TabsContent value="reserve-pool">
-            <ReservePoolPanel />
-          </TabsContent>
+      {/* Recent Activity */}
+      <Section title="Recent Activity" subtitle="Your latest transactions">
+        <ThemedCard className="p-6">
+          <div className="space-y-3">
+            {recentActivities.map((activity, index) => (
+              <div
+                key={index}
+                className={cn(
+                  'flex items-center justify-between p-4 rounded-lg transition-colors',
+                  theme === 'cyberpunk'
+                    ? 'hover:bg-cyan-400/5 border border-cyan-400/10'
+                    : 'hover:bg-slate-50 border border-slate-100'
+                )}
+              >
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    'w-10 h-10 rounded-full flex items-center justify-center',
+                    activity.type === 'stake'
+                      ? theme === 'cyberpunk'
+                        ? 'bg-cyan-400/20'
+                        : 'bg-blue-100'
+                      : activity.type === 'reward'
+                        ? theme === 'cyberpunk'
+                          ? 'bg-green-400/20'
+                          : 'bg-green-100'
+                        : theme === 'cyberpunk'
+                          ? 'bg-pink-400/20'
+                          : 'bg-purple-100'
+                  )}>
+                    <Activity className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <div className="font-medium">{activity.action}</div>
+                    <div className="text-xs opacity-70">{activity.time}</div>
+                  </div>
+                </div>
+                <div className={cn(
+                  'font-bold',
+                  activity.type === 'reward' || activity.type === 'bonus'
+                    ? theme === 'cyberpunk'
+                      ? 'text-green-400'
+                      : 'text-green-600'
+                    : ''
+                )}>
+                  {activity.amount}
+                </div>
+              </div>
+            ))}
+          </div>
+        </ThemedCard>
+      </Section>
 
-          <TabsContent value="merchant">
-            <MerchantDashboard />
-          </TabsContent>
-        </Tabs>
-      </div>
-    </div>
+      {/* Quick Links */}
+      <Section>
+        <div className="grid gap-4 md:grid-cols-4">
+          <Link href="/referral">
+            <ThemedCard hover className="p-5 cursor-pointer">
+              <h4 className="font-semibold mb-1">Referral Program</h4>
+              <p className="text-xs opacity-70">Invite friends & earn</p>
+            </ThemedCard>
+          </Link>
+          <Link href="/tge">
+            <ThemedCard hover className="p-5 cursor-pointer">
+              <h4 className="font-semibold mb-1">TGE Launch</h4>
+              <p className="text-xs opacity-70">Join token sale</p>
+            </ThemedCard>
+          </Link>
+          <Link href="/app/settings">
+            <ThemedCard hover className="p-5 cursor-pointer">
+              <h4 className="font-semibold mb-1">Settings</h4>
+              <p className="text-xs opacity-70">Manage your account</p>
+            </ThemedCard>
+          </Link>
+          <Link href="/token">
+            <ThemedCard hover className="p-5 cursor-pointer">
+              <h4 className="font-semibold mb-1">Token Info</h4>
+              <p className="text-xs opacity-70">Learn about $POI</p>
+            </ThemedCard>
+          </Link>
+        </div>
+      </Section>
+    </PageLayout>
   );
 }

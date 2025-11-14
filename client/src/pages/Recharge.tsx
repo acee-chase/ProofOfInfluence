@@ -1,161 +1,180 @@
-import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldCheck, Info, Coins, CreditCard, ArrowLeft } from "lucide-react";
-import ThemeToggle from "@/components/ThemeToggle";
+import React, { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { Section } from "@/components/layout/Section";
+import { ThemedCard, ThemedButton } from "@/components/themed";
+import { useTheme } from "@/contexts/ThemeContext";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/hooks/useAuth";
 import StripePayment from "@/components/StripePayment";
-import type { PoiTier } from "@shared/schema";
+import { Shield, Wallet, Coins, ArrowRight } from "lucide-react";
 
-export default function Recharge() {
-  const [, setLocation] = useLocation();
-  const [tiers, setTiers] = useState<PoiTier[]>([]);
-  const [region, setRegion] = useState("US");
-  const [feeCreditEnabled, setFeeCreditEnabled] = useState(false);
-
-  useEffect(() => {
-    // Fetch configuration data
-    Promise.all([
-      fetch("/api/poi/tiers").then(r => r.json()),
-      fetch("/api/region").then(r => r.json()),
-      fetch("/api/features").then(r => r.json())
-    ]).then(([tierRes, regionRes, featureRes]) => {
-      setTiers(tierRes);
-      setRegion(regionRes.region);
-      setFeeCreditEnabled(!!featureRes.FEATURE_POI_FEE_CREDIT);
-    }).catch(error => {
-      console.error("Error fetching configuration:", error);
-    });
-  }, []);
-
-  const handleBack = () => {
-    window.history.back();
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
-      <div className="absolute top-4 left-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleBack}
-          data-testid="button-back"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-      </div>
-      
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
-
-      <div className="max-w-5xl mx-auto px-4 py-12 md:py-20">
-        <div className="flex flex-col items-center space-y-8">
-          {/* Header */}
-          <div className="space-y-4 text-center">
-            <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              充值 $POI Token
-            </h1>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              $POI 是平台功能型代币，用于会员等级与平台费用优惠。购买 RWA 名表请使用 Visa / Crypto；$POI 不直接作为商品价款的支付工具。
-            </p>
-          </div>
-
-          {/* Compliance Notice */}
-          <Alert className="bg-muted/40 max-w-3xl">
-            <ShieldCheck className="h-5 w-5" />
-            <AlertTitle>合规与使用范围</AlertTitle>
-            <AlertDescription>
-              <ul className="list-disc pl-4 space-y-1 mt-2">
-                <li>$POI 为功能型代币，符合平台合规要求</li>
-                <li><strong>会员等级折扣（全局）</strong>：持有/质押 $POI 可获得平台费用/物流补贴优惠</li>
-                {feeCreditEnabled ? (
-                  <li><strong>费用抵扣积分（本地区开放）</strong>：燃烧 $POI 兑换 Fee Credits，仅抵平台相关费用（不抵商品价款），抵扣上限 15-20%</li>
-                ) : (
-                  <li>费用抵扣积分在您所在地区暂未开放</li>
-                )}
-              </ul>
-            </AlertDescription>
-          </Alert>
-
-          {/* Stripe Payment Component */}
-          <StripePayment />
-
-          {/* Alternative Payment Methods */}
-          <Card className="p-6 space-y-4 max-w-3xl w-full">
-            <h2 className="text-2xl font-semibold text-center">其他支付方式</h2>
-            <div className="flex flex-wrap gap-3 justify-center">
-              <Button variant="outline"><CreditCard className="mr-2 h-4 w-4" /> 使用 Visa 购买</Button>
-              <Button variant="outline"><Coins className="mr-2 h-4 w-4" /> 使用 Crypto 购买</Button>
-            </div>
-            <p className="text-xs text-center text-muted-foreground">
-              购买即表示您理解 $POI 为平台功能型代币；价格或有波动；不同地区功能可能有所差异。
-            </p>
-          </Card>
-
-          {/* Tier Benefits */}
-          <Card className="p-6 space-y-4 max-w-3xl w-full">
-            <h3 className="text-xl font-semibold text-center">会员等级权益</h3>
-            {tiers.length > 0 ? (
-              <ul className="list-disc pl-6 text-sm text-muted-foreground space-y-2">
-                {tiers.map((tier) => {
-                  const discountPercent = (parseFloat(tier.feeDiscountRate) * 100).toFixed(0);
-                  const shippingCap = (tier.shippingCreditCapCents / 100).toFixed(0);
-                  return (
-                    <li key={tier.id}>
-                      {tier.name}（≥{tier.minPoi.toLocaleString()} POI）：
-                      平台费 -{discountPercent}%，物流补贴封顶 ${shippingCap}
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <ul className="list-disc pl-6 text-sm text-muted-foreground space-y-2">
-                <li>Lv1（≥5,000 POI）：平台费 -5%，物流补贴封顶 $50</li>
-                <li>Lv2（≥25,000 POI）：平台费 -10%，物流补贴封顶 $150</li>
-                <li>Lv3（≥100,000 POI）：平台费 -15%，物流补贴封顶 $300</li>
-              </ul>
-            )}
-          </Card>
-
-          {/* Fee Credits Feature */}
-          {feeCreditEnabled && (
-            <Card className="p-6 space-y-4 max-w-3xl w-full">
-              <h3 className="text-xl font-semibold">费用抵扣积分（Fee Credits）</h3>
-              <p className="text-sm text-muted-foreground">
-                通过燃烧 $POI 可兑换 Fee Credits，仅用于抵扣平台服务费/保真/托管/物流补贴，单笔抵扣不超过相应费用的 20%。
-                （可用性与上限以结算页展示为准）
-              </p>
-              <div className="flex gap-2 flex-wrap">
-                <Button disabled>烧毁 $POI 兑换积分</Button>
-                <Button variant="outline" onClick={() => setLocation("/dashboard")}>查看我的积分余额</Button>
-              </div>
-            </Card>
-          )}
-
-          {/* RWA Information */}
-          <Alert variant="default" className="max-w-3xl">
-            <Info className="h-5 w-5" />
-            <AlertTitle>名贵手表 RWA 说明</AlertTitle>
-            <AlertDescription className="space-y-2 text-sm">
-              <p>
-                <strong>可溯源：</strong>出厂/购入/鉴定/维保/过户链上备案（哈希+时间戳）。
-              </p>
-              <p>
-                <strong>匿名传递：</strong>仅限"库内过户或仅转凭证"。一旦发货，需完成 KYC 且物流信息会暴露身份。
-              </p>
-            </AlertDescription>
-          </Alert>
-
-          {/* Terms and Conditions */}
-          <p className="text-xs text-center text-muted-foreground max-w-2xl">
-            $POI 代币的购买与使用需遵守平台服务条款和适用法律法规。代币价格可能波动，不构成投资建议。
-            不同地区的功能和优惠可能存在差异，具体以当地规则为准。
-          </p>
-        </div>
-      </div>
-    </div>
-  );
+interface ImmortalityBalanceResponse {
+  credits: number;
+  poiCredits: number;
 }
 
+export default function Recharge() {
+  const { theme } = useTheme();
+  const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
+
+  const { data: balance, refetch, isFetching } = useQuery<ImmortalityBalanceResponse>({
+    queryKey: ["/api/immortality/balance"],
+    enabled: isAuthenticated,
+  });
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session_id");
+    if (sessionId) {
+      toast({
+        title: "充值处理中",
+        description: "Stripe 支付已完成，余额即将更新。",
+      });
+      refetch();
+      params.delete("session_id");
+      const newUrl =
+        window.location.pathname + (params.toString() ? `?${params.toString()}` : "");
+      window.history.replaceState({}, "", newUrl);
+    }
+  }, [refetch, toast]);
+
+  const credits = balance?.credits ?? 0;
+
+  return (
+    <PageLayout>
+      <Section>
+        <div className="max-w-4xl mx-auto text-center space-y-4">
+          <p className={cn(
+            "text-xs uppercase tracking-widest opacity-70",
+            theme === "cyberpunk" ? "text-cyan-300" : "text-slate-500"
+          )}>
+            Immortality Plan · Layer 2
+          </p>
+          <h1 className={cn(
+            "text-3xl font-bold",
+            theme === "cyberpunk" ? "font-orbitron text-cyan-100" : "font-fredoka text-slate-900"
+          )}>
+            Recharge Immortality Credits
+          </h1>
+          <p className="text-sm opacity-80">
+            使用法币充值，获得 Immortality Credits。Credits 会记录在中心化账本中，
+            可在 Roblox / AgentKit / ProjectX 中消费或兑换成 POI。
+          </p>
+                  </div>
+      </Section>
+
+      <Section title="Immortality Balance" subtitle="中心化账本用于记录法币 inflow，未来可兑换 POI">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ThemedCard className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-widest opacity-70">Current Balance</p>
+                <div className="text-3xl font-bold">
+                  {credits.toLocaleString()} 点
+                  {isFetching && <span className="ml-2 text-xs opacity-70">刷新中…</span>}
+                </div>
+          </div>
+              <Coins className="w-10 h-10 text-primary" />
+                  </div>
+            <p className="text-sm opacity-80">
+              Credits = Layer 2 余额。它们暂存在中心化账本，方便对账 / 合规，也能在未来转换成 POI 或直接用于
+              Immortality 服务。
+            </p>
+            <p className="text-xs opacity-60">
+              未取得牌照之前我们不会直接发 POI。Credits 可审计、可退款，也能在法币/链上之间灵活切换。
+            </p>
+                </ThemedCard>
+
+          <ThemedCard className="p-6 space-y-3">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              Ledger 原则
+            </h3>
+            <p className="text-sm opacity-80">
+              1) 每笔 Stripe 充值都会写入 `fiat_transactions` 与 `user_balances`；<br />
+              2) Ledger 是审计与退款的唯一来源；<br />
+              3) 未来兑换 POI 时，会参考 Ledger 数据进行结算。
+            </p>
+          </ThemedCard>
+                </div>
+      </Section>
+
+      <Section title="使用 Stripe 充值" subtitle="信用卡 / Apple Pay / Google Pay">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ThemedCard className="p-6">
+            <StripePayment disabled={!isAuthenticated} />
+            {!isAuthenticated && (
+              <p className="text-xs text-center text-red-500 mt-3">请先登录账户再进行充值。</p>
+            )}
+          </ThemedCard>
+
+          <ThemedCard className="p-6 space-y-3">
+            <div className="flex items-center gap-2">
+              <Wallet className="w-5 h-5" />
+              <h3 className="font-semibold">操作步骤</h3>
+              </div>
+            <ol className="list-decimal list-inside space-y-2 text-sm opacity-80">
+              <li>输入金额并跳转 Stripe Checkout（当前可使用测试卡）。</li>
+              <li>支付完成返回 `/recharge`，系统根据 session_id 自动刷新余额。</li>
+              <li>Credits 立即可用：可在 Immortality 体验中消费，或稍后兑换 POI。</li>
+            </ol>
+            <div className="text-xs opacity-60">
+              Webhook 会把每笔 session 写入 `fiat_transactions`、`user_balances`、`immortality_ledger`，方便审计。
+            </div>
+          </ThemedCard>
+        </div>
+      </Section>
+
+      <Section title="链上购买（Layer 1）">
+        <ThemedCard className="p-6 flex flex-col gap-4 md:flex-row md:items-center">
+          <div className="flex-1 space-y-2">
+            <h3 className="text-lg font-semibold">已经有钱包和 USDC？</h3>
+            <p className="text-sm opacity-80">
+              前往 <span className="font-semibold">Market → TGE Purchase</span> 使用 Base 网络上的
+              USDC 直接购买 POI。链上用户无需经过中心化账本。
+            </p>
+          </div>
+          <ThemedButton asChild emphasis>
+            <a href="/market">
+              去购买 POI
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </a>
+          </ThemedButton>
+        </ThemedCard>
+      </Section>
+
+      <Section title="常见问题" subtitle="Immortality Credits 与法币路径">
+        <div className="grid gap-4 md:grid-cols-2 max-w-4xl mx-auto">
+          <ThemedCard className="p-5 space-y-2">
+            <h4 className="font-bold">Stripe 测试模式</h4>
+            <p className="text-sm opacity-80">
+              在 `.env` 中设置 `STRIPE_SECRET_KEY`（test）和 `STRIPE_WEBHOOK_SECRET`，使用
+              4242 4242 4242 4242 卡号即可跑通全流程。
+            </p>
+          </ThemedCard>
+          <ThemedCard className="p-5 space-y-2">
+            <h4 className="font-bold">Credits 与 POI 的兑换</h4>
+            <p className="text-sm opacity-80">
+              MVP 阶段 1 Credit ≈ 1 USD。未来会提供“兑换 POI”按钮，或在 Immortality 服务内直接扣减。
+            </p>
+          </ThemedCard>
+          <ThemedCard className="p-5 space-y-2">
+            <h4 className="font-bold">数据如何导出？</h4>
+            <p className="text-sm opacity-80">
+              数据保存在 `fiat_transactions`、`user_balances`、`immortality_ledger` 表，可直接用 SQL 或 BI 工具分析。
+            </p>
+          </ThemedCard>
+          <ThemedCard className="p-5 space-y-2">
+            <h4 className="font-bold">支付失败怎么办？</h4>
+            <p className="text-sm opacity-80">
+              失败 / 过期的 session 会被标记为 failed，不会增加 Credits。可直接重新发起一次支付。
+            </p>
+          </ThemedCard>
+        </div>
+      </Section>
+    </PageLayout>
+  );
+}

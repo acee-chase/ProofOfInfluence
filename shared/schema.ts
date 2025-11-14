@@ -94,6 +94,40 @@ export const transactions = pgTable("transactions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Fiat transactions - Stripe ledger
+export const fiatTransactions = pgTable("fiat_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  stripeSessionId: varchar("stripe_session_id").unique(),
+  amountFiat: integer("amount_fiat").notNull(), // in cents
+  currency: varchar("currency").default("usd").notNull(),
+  status: varchar("status").default("pending").notNull(), // pending, completed, failed, refunded
+  credits: integer("credits").default(0).notNull(), // Immortality credits granted
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// User balances - Immortality credits ledger
+export const userBalances = pgTable("user_balances", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  immortalityCredits: integer("immortality_credits").default(0).notNull(),
+  poiCredits: integer("poi_credits").default(0).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Ledger entries for audit trail
+export const immortalityLedger = pgTable("immortality_ledger", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type").notNull(), // credit | debit
+  amountCredits: integer("amount_credits").notNull(),
+  source: varchar("source").notNull(), // stripe, manual, spend, etc.
+  reference: varchar("reference"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // POI Tiers - membership levels based on POI balance/staking
 export const poiTiers = pgTable("poi_tiers", {
   id: serial("id").primaryKey(),
@@ -334,6 +368,21 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   updatedAt: true,
 });
 
+export const insertFiatTransactionSchema = createInsertSchema(fiatTransactions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertUserBalanceSchema = createInsertSchema(userBalances).omit({
+  updatedAt: true,
+});
+
+export const insertImmortalityLedgerSchema = createInsertSchema(immortalityLedger).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertPoiTierSchema = createInsertSchema(poiTiers).omit({
   id: true,
 });
@@ -414,6 +463,12 @@ export type Link = typeof links.$inferSelect;
 
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
+export type InsertFiatTransaction = z.infer<typeof insertFiatTransactionSchema>;
+export type FiatTransaction = typeof fiatTransactions.$inferSelect;
+export type InsertUserBalance = z.infer<typeof insertUserBalanceSchema>;
+export type UserBalance = typeof userBalances.$inferSelect;
+export type InsertImmortalityLedgerEntry = z.infer<typeof insertImmortalityLedgerSchema>;
+export type ImmortalityLedgerEntry = typeof immortalityLedger.$inferSelect;
 
 export type InsertPoiTier = z.infer<typeof insertPoiTierSchema>;
 export type PoiTier = typeof poiTiers.$inferSelect;
@@ -450,3 +505,132 @@ export type MerchantOrder = typeof merchantOrders.$inferSelect;
 
 export type InsertTaxReport = z.infer<typeof insertTaxReportSchema>;
 export type TaxReport = typeof taxReports.$inferSelect;
+
+// TGE Email Subscriptions table
+export const tgeEmailSubscriptions = pgTable("tge_email_subscriptions", {
+  id: serial("id").primaryKey(),
+  email: varchar("email", { length: 255 }).notNull().unique(),
+  source: varchar("source", { length: 50 }).default("tge_page"), // tge_page, early_bird, etc.
+  subscribed: boolean("subscribed").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertTgeEmailSubscriptionSchema = createInsertSchema(tgeEmailSubscriptions, {
+  email: z.string().email("Invalid email address"),
+  source: z.string().optional(),
+});
+
+export type InsertTgeEmailSubscription = z.infer<typeof insertTgeEmailSubscriptionSchema>;
+export type TgeEmailSubscription = typeof tgeEmailSubscriptions.$inferSelect;
+
+// Early-Bird Tasks table - Define available tasks
+export const earlyBirdTasks = pgTable("early_bird_tasks", {
+  id: varchar("id", { length: 100 }).primaryKey(), // e.g., "register_verify_email"
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description").notNull(),
+  reward: integer("reward").notNull(), // POI amount
+  isActive: boolean("is_active").default(true).notNull(),
+  sortOrder: integer("sort_order").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEarlyBirdTaskSchema = createInsertSchema(earlyBirdTasks);
+
+export type InsertEarlyBirdTask = z.infer<typeof insertEarlyBirdTaskSchema>;
+export type EarlyBirdTask = typeof earlyBirdTasks.$inferSelect;
+
+// User Early-Bird Task Progress table - Track user completion
+export const userEarlyBirdProgress = pgTable("user_early_bird_progress", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  taskId: varchar("task_id", { length: 100 }).notNull().references(() => earlyBirdTasks.id, { onDelete: "cascade" }),
+  completed: boolean("completed").default(false).notNull(),
+  completedAt: timestamp("completed_at"),
+  claimed: boolean("claimed").default(false).notNull(),
+  claimedAt: timestamp("claimed_at"),
+  rewardAmount: integer("reward_amount").default(0).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("user_task_unique").on(table.userId, table.taskId),
+]);
+
+export const insertUserEarlyBirdProgressSchema = createInsertSchema(userEarlyBirdProgress);
+
+export type InsertUserEarlyBirdProgress = z.infer<typeof insertUserEarlyBirdProgressSchema>;
+export type UserEarlyBirdProgress = typeof userEarlyBirdProgress.$inferSelect;
+
+// Early-Bird Campaign Config table
+export const earlyBirdConfig = pgTable("early_bird_config", {
+  id: serial("id").primaryKey(),
+  endDate: timestamp("end_date").notNull(),
+  participantCap: integer("participant_cap"), // Optional: max participants
+  totalRewardPool: varchar("total_reward_pool", { length: 100 }).notNull(), // Total POI allocated
+  isActive: boolean("is_active").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+
+export const insertEarlyBirdConfigSchema = createInsertSchema(earlyBirdConfig);
+
+export type InsertEarlyBirdConfig = z.infer<typeof insertEarlyBirdConfigSchema>;
+export type EarlyBirdConfig = typeof earlyBirdConfig.$inferSelect;
+
+// Referral Program tables
+// Stores user referral codes and tracking
+export const referralCodes = pgTable("referral_codes", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  referralCode: varchar("referral_code", { length: 20 }).notNull().unique(),
+  createdAt: timestamp("created_at").defaultNow(),
+});
+
+export const insertReferralCodeSchema = createInsertSchema(referralCodes);
+
+export type InsertReferralCode = z.infer<typeof insertReferralCodeSchema>;
+export type ReferralCode = typeof referralCodes.$inferSelect;
+
+// Stores referral relationships
+export const referrals = pgTable("referrals", {
+  id: serial("id").primaryKey(),
+  inviterId: varchar("inviter_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  inviteeId: varchar("invitee_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  referralCode: varchar("referral_code", { length: 20 }).notNull(),
+  status: varchar("status", { length: 20 }).default("registered").notNull(), // registered, verified, activated
+  inviterRewardAmount: integer("inviter_reward_amount").default(0).notNull(),
+  inviteeRewardAmount: integer("invitee_reward_amount").default(0).notNull(),
+  inviterRewarded: boolean("inviter_rewarded").default(false).notNull(),
+  inviteeRewarded: boolean("invitee_rewarded").default(false).notNull(),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  uniqueIndex("referral_invitee_unique").on(table.inviteeId),
+]);
+
+export const insertReferralSchema = createInsertSchema(referrals);
+
+export type InsertReferral = z.infer<typeof insertReferralSchema>;
+export type Referral = typeof referrals.$inferSelect;
+
+// Airdrop Eligibility table
+export const airdropEligibility = pgTable("airdrop_eligibility", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").unique().references(() => users.id, { onDelete: "cascade" }),
+  walletAddress: varchar("wallet_address", { length: 42 }).unique(),
+  amount: integer("amount").notNull(), // POI amount
+  eligible: boolean("eligible").default(true).notNull(),
+  claimed: boolean("claimed").default(false).notNull(),
+  claimDate: timestamp("claim_date"),
+  vestingInfo: text("vesting_info"), // Optional vesting details
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => [
+  index("airdrop_wallet_idx").on(table.walletAddress),
+]);
+
+export const insertAirdropEligibilitySchema = createInsertSchema(airdropEligibility);
+
+export type InsertAirdropEligibility = z.infer<typeof insertAirdropEligibilitySchema>;
+export type AirdropEligibility = typeof airdropEligibility.$inferSelect;

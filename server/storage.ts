@@ -4,6 +4,9 @@ import {
   profiles,
   links,
   transactions,
+  fiatTransactions,
+  userBalances,
+  immortalityLedger,
   poiTiers,
   poiFeeCredits,
   poiBurnIntents,
@@ -16,6 +19,13 @@ import {
   products,
   merchantOrders,
   taxReports,
+  tgeEmailSubscriptions,
+  earlyBirdTasks,
+  userEarlyBirdProgress,
+  earlyBirdConfig,
+  referralCodes,
+  referrals,
+  airdropEligibility,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -25,6 +35,12 @@ import {
   type InsertLink,
   type Transaction,
   type InsertTransaction,
+  type FiatTransaction,
+  type InsertFiatTransaction,
+  type UserBalance,
+  type InsertUserBalance,
+  type ImmortalityLedgerEntry,
+  type InsertImmortalityLedgerEntry,
   type PoiTier,
   type InsertPoiTier,
   type PoiFeeCredit,
@@ -49,6 +65,20 @@ import {
   type InsertMerchantOrder,
   type TaxReport,
   type InsertTaxReport,
+  type TgeEmailSubscription,
+  type InsertTgeEmailSubscription,
+  type EarlyBirdTask,
+  type InsertEarlyBirdTask,
+  type UserEarlyBirdProgress,
+  type InsertUserEarlyBirdProgress,
+  type EarlyBirdConfig,
+  type InsertEarlyBirdConfig,
+  type ReferralCode,
+  type InsertReferralCode,
+  type Referral,
+  type InsertReferral,
+  type AirdropEligibility,
+  type InsertAirdropEligibility,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, or, lte } from "drizzle-orm";
@@ -86,6 +116,21 @@ export interface IStorage {
   getTransactionBySessionId(sessionId: string): Promise<Transaction | undefined>;
   updateTransaction(id: string, updates: Partial<InsertTransaction>): Promise<Transaction>;
   getUserTransactions(userId: string): Promise<Transaction[]>;
+  createFiatTransaction(transaction: InsertFiatTransaction): Promise<FiatTransaction>;
+  getFiatTransactionBySessionId(sessionId: string): Promise<FiatTransaction | undefined>;
+  updateFiatTransaction(id: string, updates: Partial<InsertFiatTransaction>): Promise<FiatTransaction>;
+  updateFiatTransactionBySessionId(
+    sessionId: string,
+    updates: Partial<InsertFiatTransaction>,
+  ): Promise<FiatTransaction | undefined>;
+  getUserBalance(userId: string): Promise<UserBalance | undefined>;
+  adjustImmortalityCredits(params: {
+    userId: string;
+    credits: number;
+    source: string;
+    reference?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<{ balance: UserBalance; ledger: ImmortalityLedgerEntry }>;
   
   // POI Tier operations
   getAllTiers(): Promise<PoiTier[]>;
@@ -352,6 +397,82 @@ export class DatabaseStorage implements IStorage {
       .from(transactions)
       .where(eq(transactions.userId, userId))
       .orderBy(desc(transactions.createdAt));
+  }
+
+  async createFiatTransaction(transaction: InsertFiatTransaction): Promise<FiatTransaction> {
+    const [row] = await db.insert(fiatTransactions).values(transaction).returning();
+    return row;
+  }
+
+  async updateFiatTransaction(id: string, updates: Partial<InsertFiatTransaction>): Promise<FiatTransaction> {
+    const [row] = await db
+      .update(fiatTransactions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(fiatTransactions.id, id))
+      .returning();
+    return row;
+  }
+
+  async getFiatTransactionBySessionId(sessionId: string): Promise<FiatTransaction | undefined> {
+    const [row] = await db.select().from(fiatTransactions).where(eq(fiatTransactions.stripeSessionId, sessionId));
+    return row;
+  }
+
+  async updateFiatTransactionBySessionId(
+    sessionId: string,
+    updates: Partial<InsertFiatTransaction>,
+  ): Promise<FiatTransaction | undefined> {
+    const [row] = await db
+      .update(fiatTransactions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(fiatTransactions.stripeSessionId, sessionId))
+      .returning();
+    return row;
+  }
+
+  async getUserBalance(userId: string): Promise<UserBalance | undefined> {
+    const [balance] = await db.select().from(userBalances).where(eq(userBalances.userId, userId));
+    return balance;
+  }
+
+  async adjustImmortalityCredits(params: {
+    userId: string;
+    credits: number;
+    source: string;
+    reference?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<{ balance: UserBalance; ledger: ImmortalityLedgerEntry }> {
+    const { userId, credits, source, reference, metadata } = params;
+    const [balance] = await db
+      .insert(userBalances)
+      .values({
+        userId,
+        immortalityCredits: credits,
+        poiCredits: 0,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: userBalances.userId,
+        set: {
+          immortalityCredits: sql`${userBalances.immortalityCredits} + ${credits}`,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    const [ledger] = await db
+      .insert(immortalityLedger)
+      .values({
+        userId,
+        type: credits >= 0 ? "credit" : "debit",
+        amountCredits: Math.abs(credits),
+        source,
+        reference: reference || null,
+        metadata: metadata ?? null,
+      })
+      .returning();
+
+    return { balance, ledger };
   }
 
   // POI Tier operations
@@ -950,6 +1071,350 @@ export class DatabaseStorage implements IStorage {
       .where(eq(taxReports.id, reportId))
       .returning();
     return updated;
+  }
+
+  // TGE Email Subscription
+  async subscribeTgeEmail(email: string, source?: string): Promise<TgeEmailSubscription> {
+    const [subscription] = await db
+      .insert(tgeEmailSubscriptions)
+      .values({
+        email: email.toLowerCase().trim(),
+        source: source || 'tge_page',
+      })
+      .onConflictDoUpdate({
+        target: tgeEmailSubscriptions.email,
+        set: {
+          subscribed: true,
+          updatedAt: sql`NOW()`,
+        },
+      })
+      .returning();
+    return subscription;
+  }
+
+  // User Statistics
+  async getTotalUsersCount(): Promise<number> {
+    const [result] = await db
+      .select({ count: sql<number>`COUNT(*)` })
+      .from(users);
+    return Number(result?.count ?? 0);
+  }
+
+  // Early-Bird Tasks
+  async getEarlyBirdTasks(): Promise<EarlyBirdTask[]> {
+    return await db
+      .select()
+      .from(earlyBirdTasks)
+      .where(eq(earlyBirdTasks.isActive, true))
+      .orderBy(earlyBirdTasks.sortOrder);
+  }
+
+  async createEarlyBirdTask(task: InsertEarlyBirdTask): Promise<EarlyBirdTask> {
+    const [created] = await db.insert(earlyBirdTasks).values(task).returning();
+    return created;
+  }
+
+  // User Early-Bird Progress
+  async getUserEarlyBirdProgress(userId: string): Promise<UserEarlyBirdProgress[]> {
+    return await db
+      .select()
+      .from(userEarlyBirdProgress)
+      .where(eq(userEarlyBirdProgress.userId, userId));
+  }
+
+  async markTaskComplete(userId: string, taskId: string, rewardAmount: number): Promise<UserEarlyBirdProgress> {
+    const [progress] = await db
+      .insert(userEarlyBirdProgress)
+      .values({
+        userId,
+        taskId,
+        completed: true,
+        completedAt: sql`NOW()`,
+        rewardAmount,
+      })
+      .onConflictDoUpdate({
+        target: [userEarlyBirdProgress.userId, userEarlyBirdProgress.taskId],
+        set: {
+          completed: true,
+          completedAt: sql`NOW()`,
+          updatedAt: sql`NOW()`,
+        },
+      })
+      .returning();
+    return progress;
+  }
+
+  // Early-Bird Campaign Stats
+  async getEarlyBirdStats(): Promise<{
+    totalParticipants: number;
+    totalRewardsDistributed: string;
+    config: EarlyBirdConfig | undefined;
+  }> {
+    // Get unique participants count
+    const [participantsResult] = await db
+      .select({ count: sql<number>`COUNT(DISTINCT ${userEarlyBirdProgress.userId})` })
+      .from(userEarlyBirdProgress)
+      .where(eq(userEarlyBirdProgress.completed, true));
+
+    // Get total rewards distributed
+    const [rewardsResult] = await db
+      .select({ total: sql<string>`COALESCE(SUM(${userEarlyBirdProgress.rewardAmount}), '0')` })
+      .from(userEarlyBirdProgress)
+      .where(eq(userEarlyBirdProgress.completed, true));
+
+    // Get active config
+    const [config] = await db
+      .select()
+      .from(earlyBirdConfig)
+      .where(eq(earlyBirdConfig.isActive, true))
+      .orderBy(desc(earlyBirdConfig.createdAt))
+      .limit(1);
+
+    return {
+      totalParticipants: Number(participantsResult?.count ?? 0),
+      totalRewardsDistributed: rewardsResult?.total ?? '0',
+      config,
+    };
+  }
+
+  async getUserEarlyBirdSummary(userId: string): Promise<{
+    totalEarned: number;
+    totalPotential: number;
+    tasksCompleted: number;
+    totalTasks: number;
+  }> {
+    // Get all active tasks
+    const allTasks = await this.getEarlyBirdTasks();
+    const totalTasks = allTasks.length;
+    const totalPotential = allTasks.reduce((sum, task) => sum + task.reward, 0);
+
+    // Get user's completed tasks
+    const userProgress = await this.getUserEarlyBirdProgress(userId);
+    const completedTasks = userProgress.filter(p => p.completed);
+    const tasksCompleted = completedTasks.length;
+    const totalEarned = completedTasks.reduce((sum, p) => sum + p.rewardAmount, 0);
+
+    return {
+      totalEarned,
+      totalPotential,
+      tasksCompleted,
+      totalTasks,
+    };
+  }
+
+  async getEarlyBirdConfig(): Promise<EarlyBirdConfig | undefined> {
+    const [config] = await db
+      .select()
+      .from(earlyBirdConfig)
+      .where(eq(earlyBirdConfig.isActive, true))
+      .orderBy(desc(earlyBirdConfig.createdAt))
+      .limit(1);
+    return config;
+  }
+
+  async createEarlyBirdConfig(config: InsertEarlyBirdConfig): Promise<EarlyBirdConfig> {
+    const [created] = await db.insert(earlyBirdConfig).values(config).returning();
+    return created;
+  }
+
+  // Referral Program
+  async getOrCreateReferralCode(userId: string): Promise<ReferralCode> {
+    // Check if user already has a referral code
+    const [existing] = await db
+      .select()
+      .from(referralCodes)
+      .where(eq(referralCodes.userId, userId));
+
+    if (existing) {
+      return existing;
+    }
+
+    // Generate a unique referral code
+    const code = this.generateReferralCode();
+    const [created] = await db
+      .insert(referralCodes)
+      .values({
+        userId,
+        referralCode: code,
+      })
+      .returning();
+    
+    return created;
+  }
+
+  private generateReferralCode(): string {
+    // Generate a random 8-character alphanumeric code
+    const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 8; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    return code;
+  }
+
+  async createReferral(inviterId: string, inviteeId: string, referralCode: string): Promise<Referral> {
+    const [referral] = await db
+      .insert(referrals)
+      .values({
+        inviterId,
+        inviteeId,
+        referralCode,
+        status: 'registered',
+        inviterRewardAmount: 10, // Default reward
+        inviteeRewardAmount: 5,  // Default reward
+      })
+      .returning();
+    
+    return referral;
+  }
+
+  async getReferralByCode(code: string): Promise<ReferralCode | undefined> {
+    const [referralCode] = await db
+      .select()
+      .from(referralCodes)
+      .where(eq(referralCodes.referralCode, code));
+    
+    return referralCode;
+  }
+
+  async getUserReferralStats(userId: string): Promise<{
+    totalInvites: number;
+    successfulReferrals: number;
+    totalEarned: number;
+    pendingRewards: number;
+  }> {
+    // Get all referrals by this user
+    const userReferrals = await db
+      .select()
+      .from(referrals)
+      .where(eq(referrals.inviterId, userId));
+
+    const totalInvites = userReferrals.length;
+    const successfulReferrals = userReferrals.filter(r => r.status === 'verified' || r.status === 'activated').length;
+    const totalEarned = userReferrals
+      .filter(r => r.inviterRewarded)
+      .reduce((sum, r) => sum + r.inviterRewardAmount, 0);
+    const pendingRewards = userReferrals
+      .filter(r => !r.inviterRewarded && (r.status === 'verified' || r.status === 'activated'))
+      .reduce((sum, r) => sum + r.inviterRewardAmount, 0);
+
+    return {
+      totalInvites,
+      successfulReferrals,
+      totalEarned,
+      pendingRewards,
+    };
+  }
+
+  async getReferralLeaderboard(limit: number = 10): Promise<Array<{
+    userId: string;
+    username: string;
+    referralCount: number;
+  }>> {
+    const results = await db
+      .select({
+        userId: referrals.inviterId,
+        referralCount: sql<number>`COUNT(*)`,
+      })
+      .from(referrals)
+      .where(or(eq(referrals.status, 'verified'), eq(referrals.status, 'activated')))
+      .groupBy(referrals.inviterId)
+      .orderBy(desc(sql`COUNT(*)`))
+      .limit(limit);
+
+    // Get usernames for top referrers
+    const leaderboard = await Promise.all(
+      results.map(async (entry, index) => {
+        const user = await this.getUser(entry.userId);
+        return {
+          userId: entry.userId,
+          username: user?.username || `用户***${entry.userId.slice(-4)}`,
+          referralCount: Number(entry.referralCount),
+        };
+      })
+    );
+
+    return leaderboard;
+  }
+
+  async hasBeenReferred(userId: string): Promise<boolean> {
+    const [referral] = await db
+      .select()
+      .from(referrals)
+      .where(eq(referrals.inviteeId, userId));
+    
+    return !!referral;
+  }
+
+  // Airdrop
+  async checkAirdropEligibility(userIdOrAddress: string): Promise<{
+    eligible: boolean;
+    amount: number;
+    claimed: boolean;
+    claimDate?: string;
+    vestingInfo?: string;
+  }> {
+    // Try to find by userId or walletAddress
+    const [result] = await db
+      .select()
+      .from(airdropEligibility)
+      .where(
+        or(
+          eq(airdropEligibility.userId, userIdOrAddress),
+          eq(airdropEligibility.walletAddress, userIdOrAddress.toLowerCase())
+        )
+      );
+
+    if (!result) {
+      return {
+        eligible: false,
+        amount: 0,
+        claimed: false,
+      };
+    }
+
+    return {
+      eligible: result.eligible,
+      amount: result.amount,
+      claimed: result.claimed,
+      claimDate: result.claimDate?.toISOString(),
+      vestingInfo: result.vestingInfo || undefined,
+    };
+  }
+
+  async claimAirdrop(userId: string, walletAddress: string): Promise<AirdropEligibility> {
+    const [updated] = await db
+      .update(airdropEligibility)
+      .set({
+        claimed: true,
+        claimDate: sql`NOW()`,
+        updatedAt: sql`NOW()`,
+      })
+      .where(
+        and(
+          or(
+            eq(airdropEligibility.userId, userId),
+            eq(airdropEligibility.walletAddress, walletAddress.toLowerCase())
+          ),
+          eq(airdropEligibility.claimed, false)
+        )
+      )
+      .returning();
+
+    if (!updated) {
+      throw new Error("Airdrop not found or already claimed");
+    }
+
+    return updated;
+  }
+
+  async createAirdropEligibility(data: InsertAirdropEligibility): Promise<AirdropEligibility> {
+    const [created] = await db
+      .insert(airdropEligibility)
+      .values(data)
+      .returning();
+    
+    return created;
   }
 }
 

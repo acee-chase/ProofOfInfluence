@@ -9,7 +9,11 @@ import { useToast } from "@/hooks/use-toast";
 // Preset amounts for $POI token purchase
 const PRESET_AMOUNTS = [10, 50, 100];
 
-export default function StripePayment() {
+interface StripePaymentProps {
+  disabled?: boolean;
+}
+
+export default function StripePayment({ disabled = false }: StripePaymentProps) {
   const [amount, setAmount] = useState<string>("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
@@ -28,14 +32,14 @@ export default function StripePayment() {
     setIsLoading(true);
 
     try {
-      const response = await fetch("/api/create-checkout-session", {
+      const response = await fetch("/api/stripe/create-checkout-session", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify({
           amount: amountNum,
-          purpose: "Buy $POI Token",
+          currency: "usd",
         }),
       });
 
@@ -51,7 +55,9 @@ export default function StripePayment() {
       console.error("Payment error:", error);
       toast({
         title: "Payment failed",
-        description: "Unable to process payment. Please try again.",
+        description: error.message === "Unauthorized"
+          ? "Please sign in before purchasing credits."
+          : "Unable to process payment. Please try again.",
         variant: "destructive",
       });
       setIsLoading(false);
@@ -82,7 +88,7 @@ export default function StripePayment() {
                 variant={amount === preset.toString() ? "default" : "outline"}
                 size="sm"
                 onClick={() => setAmount(preset.toString())}
-                disabled={isLoading}
+              disabled={isLoading || disabled}
                 className="flex-1"
               >
                 ${preset}
@@ -110,7 +116,7 @@ export default function StripePayment() {
               onChange={(e) => setAmount(e.target.value)}
               placeholder="Enter amount"
               className="pl-7"
-              disabled={isLoading}
+              disabled={isLoading || disabled}
             />
           </div>
           <p className="text-xs text-muted-foreground">
@@ -121,7 +127,7 @@ export default function StripePayment() {
         {/* Pay Button */}
         <Button
           onClick={handlePay}
-          disabled={isLoading || !amount}
+          disabled={isLoading || !amount || disabled}
           className="w-full"
           size="lg"
         >

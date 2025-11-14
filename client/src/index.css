@@ -1,3 +1,5 @@
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800&family=Rajdhani:wght@400;600;700&family=Fredoka:wght@400;600;700&family=Poppins:wght@400;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -325,4 +327,42 @@
   .border.hover-elevate:not(.no-hover-interaction-elevate)::after {
     inset: -1px;
   }
+}
+
+/* ===================================
+   Dual Theme System: Cyberpunk + Playful
+   =================================== */
+
+/* Cyberpunk Theme (ACEE) */
+[data-theme="cyberpunk"] {
+  --background: 222 84% 5%;  /* #0a0a0f */
+  --foreground: 210 20% 90%;  /* #e2e8f0 */
+  
+  /* Cyberpunk specific colors */
+  --cyber-cyan: 186 100% 50%;  /* #00f0ff */
+  --cyber-pink: 329 100% 56%;  /* #ff006e */
+  --cyber-purple: 286 75% 50%;  /* #b620e0 */
+  --cyber-green: 160 100% 50%;  /* #00ff88 */
+}
+
+[data-theme="cyberpunk"] body {
+  background-color: #0a0a0f;
+  color: #e2e8f0;
+}
+
+/* Playful Theme (ProjectX) */
+[data-theme="playful"] {
+  --background: 0 0% 100%;  /* #ffffff */
+  --foreground: 222 47% 11%;  /* #0f172a */
+  
+  /* Playful specific colors */
+  --play-blue: 216 100% 50%;  /* #0066ff */
+  --play-green: 160 100% 40%;  /* #00cc66 */
+  --play-yellow: 45 100% 50%;  /* #ffcc00 */
+  --play-red: 349 100% 60%;  /* #ff3366 */
+}
+
+[data-theme="playful"] body {
+  background-color: #ffffff;
+  color: #0f172a;
 }

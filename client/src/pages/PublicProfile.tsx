@@ -1,369 +1,200 @@
-import { useQuery, useMutation } from "@tanstack/react-query";
-import { useParams, useLocation } from "wouter";
-import type { RouteComponentProps } from "wouter";
-import ProfileAvatar from "@/components/ProfileAvatar";
-import ThemeToggle from "@/components/ThemeToggle";
-import WalletConnectButton from "@/components/WalletConnectButton";
-import { Copy, ExternalLink, Edit, ShoppingCart, Coins } from "lucide-react";
-import { SiGoogle, SiX, SiSinaweibo, SiTiktok } from "react-icons/si";
-import { Button } from "@/components/ui/button";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/hooks/useAuth";
-import { apiRequest } from "@/lib/queryClient";
-import type { Profile as ProfileRecord, Link as LinkRecord, User } from "@shared/schema";
-import CompactSwapCard from "@/components/CompactSwapCard";
+import React from "react";
+import { useRoute } from "wouter";
+import { useQuery } from "@tanstack/react-query";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { Section } from "@/components/layout/Section";
+import { ThemedCard, ThemedBadge } from "@/components/themed";
+import { useTheme } from "@/contexts/ThemeContext";
+import { cn } from "@/lib/utils";
+import {
+  MapPin,
+  Star,
+  TrendingUp,
+  Users,
+  Award,
+  Lock,
+  Trophy,
+} from "lucide-react";
 
-export type Profile = {
-  name: string;
-  bio?: string | null;
-  avatarUrl?: string | null;
-  googleUrl?: string | null;
-  twitterUrl?: string | null;
-  weiboUrl?: string | null;
-  tiktokUrl?: string | null;
-  totalViews: number;
-};
+export default function PublicProfile() {
+  const { theme } = useTheme();
+  const [, params] = useRoute("/:username");
+  const username = params?.username || "unknown";
 
-export type Link = {
-  id: string;
-  title: string;
-  url: string;
-  visible: boolean;
-};
-
-export type PublicProfileData = {
-  profile: Profile;
-  links: Link[];
-  user: {
-    walletAddress?: string | null;
-    username?: string | null;
-  };
-};
-
-type PublicProfileProps = Partial<RouteComponentProps<{ username: string }>> & {
-  previewData?: PublicProfileData;
-};
-
-type ApiResponse = {
-  profile: ProfileRecord;
-  links: LinkRecord[];
-  user: User;
-};
-
-export default function PublicProfile(props?: PublicProfileProps) {
-  const { previewData } = props ?? {};
-  const params = useParams<{ username: string }>();
-  const username = params?.username;
-  const { toast } = useToast();
-  const [, setLocation] = useLocation();
-  const { isAuthenticated } = useAuth();
-
-  // Get current logged-in user
-  const { data: currentUser } = useQuery<User>({
-    queryKey: ["/api/auth/user"],
-    enabled: isAuthenticated,
-  });
-
-  const {
-    data,
-    isLoading,
-    error,
-  } = useQuery<ApiResponse>({
-    queryKey: ["/api/profile", username],
-    queryFn: async () => {
-      const response = await fetch(`/api/profile/${username}`);
-      if (!response.ok) {
-        throw new Error('Profile not found');
-      }
-      return response.json();
+  // Mock user profile data (would fetch from API)
+  const profile = {
+    username: `@${username}`,
+    displayName: username.charAt(0).toUpperCase() + username.slice(1),
+    location: "United States",
+    level: 4,
+    bio: "Web3 enthusiast and creator. Building the future of social finance.",
+    stats: {
+      pnl: "$4.3k",
+      tasks: "128",
+      invites: "42",
     },
-    enabled: !previewData && !!username,
-  });
-
-  const trackClickMutation = useMutation({
-    mutationFn: async (linkId: string) => {
-      await apiRequest("POST", `/api/links/${linkId}/click`, {});
-    },
-  });
-
-  const truncateAddress = (address: string) => {
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const handleLinkClick = (linkId: string, url: string) => {
-    if (!previewData) {
-      trackClickMutation.mutate(linkId);
-    }
-    window.open(url, "_blank", "noopener,noreferrer");
-  };
-
-  const copyAddress = (address: string) => {
-    navigator.clipboard.writeText(address);
-    toast({
-      title: "Address copied",
-      description: "Wallet address copied to clipboard",
-    });
-  };
-
-  if (!previewData && isLoading) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
-        <div className="absolute top-4 right-4 flex flex-wrap items-center justify-end gap-2">
-          {isAuthenticated && <WalletConnectButton />}
-          <ThemeToggle />
-        </div>
-        <div className="max-w-md mx-auto px-4 py-8 md:py-12">
-          <div className="flex flex-col items-center space-y-4">
-            <Skeleton className="h-32 w-32 rounded-full" />
-            <Skeleton className="h-8 w-48" />
-            <Skeleton className="h-16 w-full" />
-            <Skeleton className="h-12 w-full" />
-            <Skeleton className="h-12 w-full" />
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (!previewData && (error || !data)) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center">
-        <div className="absolute top-4 right-4 flex flex-wrap items-center justify-end gap-2">
-          {isAuthenticated && <WalletConnectButton />}
-          <ThemeToggle />
-        </div>
-        <div className="text-center space-y-4 p-8">
-          <h1 className="text-3xl font-bold">Profile not found</h1>
-          <p className="text-muted-foreground">
-            The user @{username} does not exist or has not published their profile.
-          </p>
-        </div>
-      </div>
-    );
-  }
-
-  const resolvedData = previewData ?? (data ? mapApiResponse(data) : undefined);
-
-  if (!resolvedData) {
-    return null;
-  }
-
-  const { profile, links, user } = resolvedData;
-  const visibleLinks = links.filter((link) => link.visible);
-
-  // Check if current user is viewing their own profile
-  const activeUsername = previewData?.user?.username ?? username;
-  const isOwnProfile = previewData ? true : currentUser?.username === activeUsername;
-
-  const socialLinks = [
-    { url: profile.googleUrl, icon: SiGoogle, label: "Google", testId: "link-google" },
-    { url: profile.twitterUrl, icon: SiX, label: "X", testId: "link-twitter" },
-    { url: profile.weiboUrl, icon: SiSinaweibo, label: "Weibo", testId: "link-weibo" },
-    { url: profile.tiktokUrl, icon: SiTiktok, label: "TikTok", testId: "link-tiktok" },
-  ].filter((social) => social.url || false);
+  // Example badges
+  const badges = [
+    { id: 1, earned: true, color: "from-cyan-400 to-blue-500" },
+    { id: 2, earned: true, color: "from-pink-400 to-purple-500" },
+    { id: 3, earned: true, color: "from-yellow-400 to-orange-500" },
+    { id: 4, earned: true, color: "from-green-400 to-teal-500" },
+    { id: 5, earned: false, color: "from-purple-400 to-pink-500" },
+    { id: 6, earned: false, color: "from-blue-400 to-cyan-500" },
+    { id: 7, earned: false, color: "from-orange-400 to-red-500" },
+    { id: 8, earned: false, color: "from-indigo-400 to-purple-500" },
+    { id: 9, earned: false, color: "from-red-400 to-pink-500" },
+    { id: 10, earned: false, color: "from-teal-400 to-green-500" },
+    { id: 11, earned: false, color: "from-violet-400 to-purple-500" },
+    { id: 12, earned: false, color: "from-amber-400 to-yellow-500" },
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
-      <div className="absolute top-4 right-4 flex flex-wrap items-center justify-end gap-2">
-        {isOwnProfile && (
-          <>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (previewData) return;
-                setLocation("/recharge");
-              }}
-              disabled={!!previewData}
-              data-testid="button-recharge"
-            >
-              <Coins className="mr-2 h-4 w-4" />
-              充值
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (previewData) return;
-                setLocation("/dashboard");
-              }}
-              disabled={!!previewData}
-              data-testid="button-edit"
-            >
-              <Edit className="mr-2 h-4 w-4" />
-              编辑资料
-            </Button>
-          </>
-        )}
-        {isAuthenticated && <WalletConnectButton />}
-        <ThemeToggle />
-      </div>
+    <PageLayout>
+      <Section>
+        <div className="max-w-4xl mx-auto">
+          {/* Profile Header */}
+          <ThemedCard className="p-6 md:p-8 mb-6">
+            <div className="grid gap-6 md:grid-cols-[200px_1fr]">
+              {/* Avatar */}
+              <div className="mx-auto md:mx-0">
+                <div className={cn(
+                  'w-32 h-32 md:w-40 md:h-40 rounded-full mb-3',
+                  theme === 'cyberpunk'
+                    ? 'bg-gradient-to-br from-cyan-400/40 to-pink-500/40 ring-4 ring-cyan-400/20'
+                    : 'bg-gradient-to-br from-blue-200 to-purple-200 ring-4 ring-blue-200'
+                )} />
 
-      <div className="max-w-lg mx-auto px-4 md:px-6 py-8 md:py-12">
-        <div className="flex flex-col items-center text-center space-y-3 mb-8">
-          <ProfileAvatar
-            src={profile.avatarUrl || undefined}
-            alt={profile.name}
-            fallback={profile.name.slice(0, 2).toUpperCase()}
-            size="large"
-          />
+                <div className="flex items-center justify-center gap-2">
+                  <Star className={cn(
+                    'w-5 h-5',
+                    theme === 'cyberpunk' ? 'text-yellow-400' : 'text-yellow-500'
+                  )} />
+                  <span className={cn(
+                    'font-bold',
+                    theme === 'cyberpunk' ? 'font-orbitron text-cyan-300' : 'font-poppins text-blue-600'
+                  )}>
+                    Level {profile.level}
+                  </span>
+                </div>
+              </div>
 
-          <h1 className="text-3xl md:text-4xl font-bold" data-testid="text-profile-name">
-            {profile.name}
-          </h1>
+              {/* Info */}
+              <div>
+                <h1 className={cn(
+                  'text-2xl md:text-3xl font-bold mb-1',
+                  theme === 'cyberpunk' ? 'font-orbitron' : 'font-fredoka'
+                )}>
+                  {profile.displayName}
+                </h1>
+                <div className="flex items-center gap-2 text-sm opacity-70 mb-3">
+                  <span>{profile.username}</span>
+                  <span>•</span>
+                  <MapPin className="w-4 h-4" />
+                  <span>{profile.location}</span>
+                </div>
 
-          {profile.bio && (
-            <p className="text-lg leading-relaxed text-muted-foreground max-w-md" data-testid="text-profile-bio">
-              {profile.bio}
-            </p>
-          )}
+                <p className="text-sm opacity-90 mb-4">{profile.bio}</p>
 
-          {socialLinks.length > 0 && (
-            <div className="flex items-center gap-3 mt-2">
-              {socialLinks.map((social) => (
-                <Button
-                  key={social.label}
-                  variant="ghost"
-                  size="icon"
-                  className="h-10 w-10"
-                  asChild
-                  data-testid={social.testId}
+                {/* Stats Grid */}
+                <div className="grid grid-cols-3 gap-3">
+                  {Object.entries(profile.stats).map(([key, value]) => (
+                    <ThemedCard key={key} className="p-3 text-center">
+                      <div className="text-xs opacity-70 mb-1 capitalize">{key}</div>
+                      <div className={cn(
+                        'font-bold',
+                        theme === 'cyberpunk' ? 'font-rajdhani text-cyan-300' : 'font-poppins text-blue-600'
+                      )}>
+                        {value}
+                      </div>
+                    </ThemedCard>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </ThemedCard>
+
+          {/* Badges Wall */}
+          <ThemedCard className="p-6">
+            <h3 className={cn(
+              'text-lg font-bold mb-4 flex items-center gap-2',
+              theme === 'cyberpunk' ? 'font-rajdhani text-cyan-200' : 'font-poppins text-slate-900'
+            )}>
+              <Award className="w-5 h-5" />
+              徽章墙
+            </h3>
+
+            <div className="grid grid-cols-6 md:grid-cols-12 gap-2">
+              {badges.map((badge) => (
+                <div
+                  key={badge.id}
+                  className={cn(
+                    'aspect-square rounded-lg transition-all relative group cursor-pointer',
+                    badge.earned
+                      ? `bg-gradient-to-br ${badge.color}`
+                      : theme === 'cyberpunk'
+                        ? 'bg-slate-800/60 border border-cyan-400/20'
+                        : 'bg-slate-100 border border-slate-200'
+                  )}
                 >
-                  <a
-                    href={social.url || ""}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    aria-label={social.label}
-                  >
-                    <social.icon className="h-5 w-5" />
-                  </a>
-                </Button>
+                  {badge.earned ? (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Trophy className="w-6 h-6 text-white drop-shadow-lg" />
+                    </div>
+                  ) : (
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <Lock className={cn(
+                        'w-4 h-4 opacity-30',
+                        theme === 'cyberpunk' ? 'text-slate-600' : 'text-slate-400'
+                      )} />
+                    </div>
+                  )}
+                </div>
               ))}
             </div>
-          )}
 
-          {user.walletAddress && (
-            <div className="flex items-center gap-2 bg-muted/50 backdrop-blur px-4 py-2 rounded-xl mt-4">
-              <span className="text-sm font-mono tracking-tight" data-testid="text-wallet-address">
-                {truncateAddress(user.walletAddress)}
-              </span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                onClick={() => {
-                  if (user.walletAddress) {
-                    copyAddress(user.walletAddress);
-                  }
-                }}
-                data-testid="button-copy-wallet"
-              >
-                <Copy className="h-3 w-3" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-6 w-6"
-                asChild
-                data-testid="link-etherscan-wallet"
-              >
-                <a
-                  href={`https://etherscan.io/address/${user.walletAddress}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                >
-                  <ExternalLink className="h-3 w-3" />
-                </a>
-              </Button>
+            <div className={cn(
+              'mt-4 text-center text-sm opacity-70',
+              theme === 'cyberpunk' ? 'font-rajdhani' : 'font-poppins'
+            )}>
+              已解锁 {badges.filter(b => b.earned).length} / {badges.length} 徽章
             </div>
-          )}
+          </ThemedCard>
 
-          {/* Trading - Link to Market Page */}
-          {isAuthenticated && (
-            <div className="mt-8 w-full">
-              <div className="p-6 rounded-xl bg-gradient-to-r from-blue-900/30 to-blue-800/20 border border-blue-700/50">
-                <div className="flex items-center gap-3 mb-3">
-                  <ShoppingCart className="w-5 h-5 text-blue-400" />
-                  <h3 className="text-lg font-semibold text-white">交易市场</h3>
+          {/* Recent Activity */}
+          <ThemedCard className="p-6 mt-6">
+            <h3 className={cn(
+              'text-lg font-bold mb-4',
+              theme === 'cyberpunk' ? 'font-rajdhani text-cyan-200' : 'font-poppins text-slate-900'
+            )}>
+              Recent Activity
+            </h3>
+
+            <div className="space-y-3">
+              {[
+                { action: "Completed Early-Bird task", time: "2 hours ago" },
+                { action: "Referred a new user", time: "5 hours ago" },
+                { action: "Earned 'Community Hero' badge", time: "1 day ago" },
+              ].map((activity, index) => (
+                <div
+                  key={index}
+                  className={cn(
+                    'flex justify-between p-3 rounded-lg',
+                    theme === 'cyberpunk'
+                      ? 'bg-slate-900/60 border border-cyan-400/10'
+                      : 'bg-slate-50 border border-slate-100'
+                  )}
+                >
+                  <span className="text-sm">{activity.action}</span>
+                  <span className="text-xs opacity-70">{activity.time}</span>
                 </div>
-                <p className="text-sm text-slate-300 mb-4">
-                  访问我们的去中心化交易市场，交易 $POI 代币
-                </p>
-                <a href="/app/market">
-                  <button className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-semibold transition-colors">
-                    前往交易市场
-                  </button>
-                </a>
-              </div>
-          </div>
-        )}
-
-        {/* 快速兑换 $POI - 紧凑版 */}
-        <div className="mt-6 w-full">
-          <div className="p-4 rounded-xl bg-gradient-to-r from-blue-900/30 to-blue-800/20 border border-blue-700/50">
-            <CompactSwapCard />
-          </div>
+              ))}
+            </div>
+          </ThemedCard>
         </div>
-
-        <p className="text-xs md:text-sm text-muted-foreground mt-4" data-testid="text-profile-views">
-          {profile.totalViews.toLocaleString()} profile views
-        </p>
-        </div>
-
-        <div className="space-y-4">
-          {visibleLinks.map((link) => (
-            <button
-              key={link.id}
-              onClick={() => handleLinkClick(link.id, link.url)}
-              className="w-full py-4 md:py-5 px-6 rounded-2xl bg-muted/50 backdrop-blur hover-elevate active-elevate-2 transition-all duration-200 text-left"
-              data-testid={`link-${link.id}`}
-            >
-              <div className="flex items-center justify-between">
-                <span className="font-semibold text-base md:text-lg">{link.title}</span>
-                <ExternalLink className="h-4 w-4 text-muted-foreground flex-shrink-0" />
-              </div>
-            </button>
-          ))}
-        </div>
-
-        {visibleLinks.length === 0 && (
-          <div className="text-center py-12">
-            <p className="text-muted-foreground">No links added yet</p>
-          </div>
-        )}
-
-        <footer className="mt-16 py-8 text-center">
-          <p className="text-sm text-muted-foreground">
-            Powered by Web3 Profile
-          </p>
-        </footer>
-      </div>
-    </div>
+      </Section>
+    </PageLayout>
   );
-}
-
-function mapApiResponse(data: ApiResponse): PublicProfileData {
-  return {
-    profile: {
-      name: data.profile.name,
-      bio: data.profile.bio,
-      avatarUrl: data.profile.avatarUrl,
-      googleUrl: data.profile.googleUrl,
-      twitterUrl: data.profile.twitterUrl,
-      weiboUrl: data.profile.weiboUrl,
-      tiktokUrl: data.profile.tiktokUrl,
-      totalViews: data.profile.totalViews,
-    },
-    links: data.links.map((link) => ({
-      id: link.id,
-      title: link.title,
-      url: link.url,
-      visible: link.visible,
-    })),
-    user: {
-      walletAddress: data.user.walletAddress,
-      username: data.user.username,
-    },
-  };
 }

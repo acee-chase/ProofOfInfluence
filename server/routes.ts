@@ -1,6 +1,7 @@
 // Backend API routes - includes Replit Auth integration from blueprint:javascript_log_in_with_replit
 import express, { type Express, type Request } from "express";
 import { createServer, type Server } from "http";
+import { ethers } from "ethers";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertProfileSchema, insertLinkSchema } from "@shared/schema";
@@ -8,6 +9,27 @@ import { stripe } from "./stripe";
 import { registerMarketRoutes } from "./routes/market";
 import { registerReservePoolRoutes } from "./routes/reservePool";
 import { registerMerchantRoutes } from "./routes/merchant";
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const tgeSaleAddress =
+  process.env.TGESALE_ADDRESS ||
+  process.env.VITE_TGESALE_ADDRESS ||
+  process.env.NEXT_PUBLIC_TGESALE_ADDRESS ||
+  "";
+const tgeRpcUrl =
+  process.env.TGE_RPC_URL ||
+  process.env.BASE_RPC_URL ||
+  process.env.VITE_BASE_RPC_URL ||
+  "https://mainnet.base.org";
+const tgeProvider = new ethers.JsonRpcProvider(tgeRpcUrl);
+const tgeSaleAbi = [
+  "function purchase(uint256 usdcAmount, bytes32[] calldata proof)",
+  "function currentTier() view returns (uint256)",
+  "function tiers(uint256) view returns (uint256 pricePerToken, uint256 remainingTokens)",
+  "function minContribution() view returns (uint256)",
+  "function maxContribution() view returns (uint256)",
+  "function totalRaised() view returns (uint256)",
+];
 
 // Extend Express Request to include user
 declare global {
@@ -285,72 +307,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stripe webhook endpoint - must be placed before other routes to handle raw body
-  app.post("/api/stripe-webhook", express.raw({ type: 'application/json' }), async (req: any, res) => {
-    const sig = req.headers['stripe-signature'];
+  const stripeWebhookMiddleware = express.raw({ type: "application/json" });
+
+  const handleStripeWebhook = async (req: any, res: any) => {
+    const sig = req.headers["stripe-signature"];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
-      console.warn('Warning: STRIPE_WEBHOOK_SECRET is not set. Webhook signature verification disabled.');
+      console.warn("Warning: STRIPE_WEBHOOK_SECRET is not set. Webhook signature verification disabled.");
     }
 
     let event;
 
     try {
-      // Verify webhook signature if secret is configured
       if (webhookSecret && sig) {
         event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
       } else {
-        // For development without webhook secret
         event = JSON.parse(req.body.toString());
       }
     } catch (err: any) {
-      console.error('Webhook signature verification failed:', err.message);
+      console.error("Webhook signature verification failed:", err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // Handle the event
     try {
       switch (event.type) {
-        case 'checkout.session.completed': {
+        case "checkout.session.completed": {
           const session = event.data.object;
-          console.log('Payment successful for session:', session.id);
+          const sessionId = session.id;
+          console.log("Payment successful for session:", sessionId);
 
-          // Get transaction from database
-          const transaction = await storage.getTransactionBySessionId(session.id);
-          
+          const transaction = await storage.getTransactionBySessionId(sessionId);
           if (transaction) {
-            // Update transaction status
             await storage.updateTransaction(transaction.id, {
-              status: 'completed',
+              status: "completed",
               stripePaymentIntentId: session.payment_intent as string,
               email: session.customer_email || transaction.email || null,
             });
-            
-            console.log(`Transaction ${transaction.id} marked as completed`);
-          } else {
-            console.error(`Transaction not found for session ${session.id}`);
+          }
+
+          const fiatTx = await storage.getFiatTransactionBySessionId(sessionId);
+          if (fiatTx && fiatTx.status !== "completed") {
+            await storage.updateFiatTransaction(fiatTx.id, {
+              status: "completed",
+              metadata: {
+                ...(fiatTx.metadata || {}),
+                eventId: event.id,
+                paymentIntentId: session.payment_intent,
+              },
+            });
+
+            if (fiatTx.userId && fiatTx.credits > 0) {
+              await storage.adjustImmortalityCredits({
+                userId: fiatTx.userId,
+                credits: fiatTx.credits,
+                source: "stripe",
+                reference: sessionId,
+                metadata: {
+                  amountFiat: fiatTx.amountFiat,
+                  currency: fiatTx.currency,
+                },
+              });
+            }
           }
           break;
         }
 
-        case 'checkout.session.expired': {
+        case "checkout.session.expired":
+        case "checkout.session.async_payment_failed":
+        case "checkout.session.async_payment_expired": {
           const session = event.data.object;
-          console.log('Payment session expired:', session.id);
+          const sessionId = session.id;
+          console.log("Payment session expired/failed:", sessionId);
 
-          const transaction = await storage.getTransactionBySessionId(session.id);
-          if (transaction && transaction.status === 'pending') {
+          const transaction = await storage.getTransactionBySessionId(sessionId);
+          if (transaction && transaction.status === "pending") {
             await storage.updateTransaction(transaction.id, {
-              status: 'failed',
+              status: "failed",
             });
           }
+
+          await storage.updateFiatTransactionBySessionId(sessionId, {
+            status: "failed",
+          });
           break;
         }
 
-        case 'payment_intent.payment_failed': {
+        case "payment_intent.payment_failed": {
           const paymentIntent = event.data.object;
-          console.log('Payment failed:', paymentIntent.id);
-          // Could update transaction status here if needed
+          console.log("Payment failed:", paymentIntent.id);
           break;
         }
 
@@ -360,27 +405,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ received: true });
     } catch (error) {
-      console.error('Error processing webhook:', error);
-      res.status(500).json({ error: 'Webhook processing failed' });
+      console.error("Error processing webhook:", error);
+      res.status(500).json({ error: "Webhook processing failed" });
     }
-  });
+  };
 
-  // Stripe payment routes
-  app.post("/api/create-checkout-session", async (req: any, res) => {
+  app.post("/api/stripe-webhook", stripeWebhookMiddleware, handleStripeWebhook);
+  app.post("/api/stripe/webhook", stripeWebhookMiddleware, handleStripeWebhook);
+
+  const createCheckoutSessionLegacy = async (req: any, res: any, requireAuth: boolean) => {
     try {
       const { amount, purpose } = req.body;
 
-      // Validate amount
       if (!amount || amount < 1 || amount > 10000) {
         return res.status(400).json({ message: "Invalid amount. Must be between $1 and $10,000" });
       }
-
-      // Validate purpose
-      if (!purpose || typeof purpose !== 'string') {
+      if (!purpose || typeof purpose !== "string") {
         return res.status(400).json({ message: "Payment purpose is required" });
       }
+      if (requireAuth && !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
 
-      const baseUrl = process.env.BASE_URL || 'http://localhost:5173';
+      const baseUrl = process.env.BASE_URL || "http://localhost:5173";
       const amountInCents = Math.round(amount * 100);
       
       // Get current user if logged in
@@ -436,6 +483,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating checkout session:", error);
       res.status(500).json({ message: "Failed to create checkout session" });
+    }
+  };
+
+  // Stripe payment routes (legacy)
+  app.post("/api/create-checkout-session", async (req: any, res) => {
+    await createCheckoutSessionLegacy(req, res, false);
+  });
+
+  // Stripe payment routes (ledger-aware)
+  app.post("/api/stripe/create-checkout-session", isAuthenticated, async (req: any, res) => {
+    try {
+      const { amount, currency = "usd" } = req.body;
+      const userId = req.user.claims.sub;
+      const userEmail = req.user.claims.email;
+
+      if (!amount || amount < 1 || amount > 10000) {
+        return res.status(400).json({ message: "Amount must be between $1 and $10,000" });
+      }
+
+      const amountInCents = Math.round(amount * 100);
+      const credits = Math.round(amount);
+      const baseUrl = process.env.BASE_URL || "http://localhost:5173";
+
+      const fiatTx = await storage.createFiatTransaction({
+        userId,
+        amountFiat: amountInCents,
+        currency,
+        status: "pending",
+        credits,
+        metadata: {
+          origin: "recharge",
+        },
+        stripeSessionId: null,
+      });
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        customer_email: userEmail || undefined,
+        line_items: [
+          {
+            price_data: {
+              currency,
+              product_data: {
+                name: "Immortality Credits",
+                description: "Recharge credits for ProjectX Immortality services",
+              },
+              unit_amount: amountInCents,
+            },
+            quantity: 1,
+          },
+        ],
+        mode: "payment",
+        success_url: `${baseUrl}/recharge?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/recharge`,
+        metadata: {
+          fiatTransactionId: fiatTx.id,
+          userId,
+          credits: credits.toString(),
+        },
+      });
+
+      await storage.updateFiatTransaction(fiatTx.id, { stripeSessionId: session.id });
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error("Error creating Stripe checkout session:", error);
+      res.status(500).json({ message: "Failed to create checkout session" });
+    }
+  });
+
+  app.get("/api/immortality/balance", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const balance = await storage.getUserBalance(userId);
+      res.json({
+        credits: balance?.immortalityCredits ?? 0,
+        poiCredits: balance?.poiCredits ?? 0,
+      });
+    } catch (error) {
+      console.error("Error fetching balance:", error);
+      res.status(500).json({ message: "Failed to fetch balance" });
     }
   });
 
@@ -753,6 +881,346 @@ export async function registerRoutes(app: Express): Promise<Server> {
       FEATURE_POI_TIER_DISCOUNT: process.env.FEATURE_POI_TIER_DISCOUNT === 'true',
       FEATURE_POI_FEE_CREDIT: process.env.FEATURE_POI_FEE_CREDIT === 'true',
     });
+  });
+
+  // TGE Routes
+  // Get TGE configuration
+  app.get("/api/tge/config", async (req, res) => {
+    try {
+      const config = {
+        launchDate: process.env.TGE_LAUNCH_DATE || "2025-12-31T00:00:00Z",
+        chain: process.env.TGE_CHAIN || "Base",
+        dex: process.env.TGE_DEX || "Uniswap V2",
+        initialPrice: process.env.TGE_INITIAL_PRICE || "TBD",
+      };
+      res.json(config);
+    } catch (error) {
+      console.error("Error fetching TGE config:", error);
+      res.status(500).json({ message: "Failed to fetch TGE configuration" });
+    }
+  });
+
+  app.get("/api/tge/status", async (_req, res) => {
+    try {
+      if (!tgeSaleAddress || tgeSaleAddress === ZERO_ADDRESS) {
+        return res.json({ configured: false });
+      }
+
+      const contract = new ethers.Contract(tgeSaleAddress, tgeSaleAbi, tgeProvider);
+      const [currentTier, minContribution, maxContribution, totalRaised] = await Promise.all([
+        contract.currentTier(),
+        contract.minContribution(),
+        contract.maxContribution(),
+        contract.totalRaised(),
+      ]);
+      const tierInfo = await contract.tiers(currentTier);
+
+      res.json({
+        configured: true,
+        saleAddress: tgeSaleAddress,
+        sale: {
+          currentTier: currentTier.toString(),
+          pricePerToken: tierInfo.pricePerToken.toString(),
+          remainingTokens: tierInfo.remainingTokens.toString(),
+          minContribution: minContribution.toString(),
+          maxContribution: maxContribution.toString(),
+          totalRaised: totalRaised.toString(),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching TGE status:", error);
+      res.status(500).json({ message: "Failed to fetch TGE status" });
+    }
+  });
+
+  // Subscribe to TGE email updates
+  app.post("/api/tge/subscribe", async (req, res) => {
+    try {
+      const { email, source } = req.body;
+      
+      if (!email || !email.includes("@")) {
+        return res.status(400).json({ message: "Invalid email address" });
+      }
+
+      const subscription = await storage.subscribeTgeEmail(email, source || "tge_page");
+      res.json({ 
+        message: "Successfully subscribed to TGE updates",
+        subscription 
+      });
+    } catch (error: any) {
+      // Handle duplicate email error
+      if (error.message?.includes("duplicate") || error.code === "23505") {
+        return res.status(200).json({ 
+          message: "You are already subscribed to TGE updates" 
+        });
+      }
+      
+      console.error("Error subscribing to TGE updates:", error);
+      res.status(500).json({ message: "Failed to subscribe to TGE updates" });
+    }
+  });
+
+  // Campaign Summary Stats (for Landing Page)
+  app.get("/api/campaign/summary", async (req, res) => {
+    try {
+      // Get total users count
+      const totalUsers = await storage.getTotalUsersCount();
+      
+      // Get early-bird stats
+      const earlyBirdStats = await storage.getEarlyBirdStats();
+      
+      const response = {
+        totalUsers,
+        totalRewardsDistributed: earlyBirdStats.totalRewardsDistributed,
+        earlyBirdSlotsRemaining: earlyBirdStats.config?.participantCap
+          ? Math.max(0, earlyBirdStats.config.participantCap - earlyBirdStats.totalParticipants)
+          : null,
+      };
+      
+      res.json(response);
+    } catch (error) {
+      console.error("Error fetching campaign summary:", error);
+      res.status(500).json({ message: "Failed to fetch campaign summary" });
+    }
+  });
+
+  // Early-Bird Routes
+  // Get campaign statistics
+  app.get("/api/early-bird/stats", async (req, res) => {
+    try {
+      const stats = await storage.getEarlyBirdStats();
+      
+      res.json({
+        totalParticipants: stats.totalParticipants,
+        participantCap: stats.config?.participantCap || null,
+        totalRewardsDistributed: stats.totalRewardsDistributed,
+        totalRewardPool: stats.config?.totalRewardPool || "100000",
+        endDate: stats.config?.endDate || new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString(),
+      });
+    } catch (error) {
+      console.error("Error fetching early-bird stats:", error);
+      res.status(500).json({ message: "Failed to fetch campaign stats" });
+    }
+  });
+
+  // Get user's rewards summary (authenticated)
+  app.get("/api/early-bird/user/rewards", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const summary = await storage.getUserEarlyBirdSummary(userId);
+      res.json(summary);
+    } catch (error) {
+      console.error("Error fetching user rewards:", error);
+      res.status(500).json({ message: "Failed to fetch user rewards" });
+    }
+  });
+
+  // Get user's task progress (authenticated)
+  app.get("/api/early-bird/user/progress", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const progress = await storage.getUserEarlyBirdProgress(userId);
+      
+      // Transform to match frontend interface
+      const formattedProgress = progress.map(p => ({
+        taskId: p.taskId,
+        completed: p.completed,
+        completedAt: p.completedAt?.toISOString(),
+        claimed: p.claimed,
+      }));
+      
+      res.json(formattedProgress);
+    } catch (error) {
+      console.error("Error fetching user progress:", error);
+      res.status(500).json({ message: "Failed to fetch user progress" });
+    }
+  });
+
+  // Get all active tasks
+  app.get("/api/early-bird/tasks", async (req, res) => {
+    try {
+      const tasks = await storage.getEarlyBirdTasks();
+      res.json(tasks);
+    } catch (error) {
+      console.error("Error fetching tasks:", error);
+      res.status(500).json({ message: "Failed to fetch tasks" });
+    }
+  });
+
+  // Mark a task as complete (authenticated) - for testing/admin
+  app.post("/api/early-bird/user/complete-task", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { taskId, rewardAmount } = req.body;
+      
+      if (!taskId) {
+        return res.status(400).json({ message: "Task ID is required" });
+      }
+      
+      const progress = await storage.markTaskComplete(userId, taskId, rewardAmount || 0);
+      res.json({ 
+        message: "Task marked as complete",
+        progress 
+      });
+    } catch (error) {
+      console.error("Error completing task:", error);
+      res.status(500).json({ message: "Failed to complete task" });
+    }
+  });
+
+  // Referral Routes
+  // Get user's referral link (authenticated)
+  app.get("/api/referral/link", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const referralCode = await storage.getOrCreateReferralCode(userId);
+      
+      // Generate full referral link
+      const baseUrl = process.env.BASE_URL || "https://proof.in";
+      const referralLink = `${baseUrl}/login?ref=${referralCode.referralCode}`;
+      
+      res.json({
+        referralCode: referralCode.referralCode,
+        referralLink,
+      });
+    } catch (error) {
+      console.error("Error fetching referral link:", error);
+      res.status(500).json({ message: "Failed to fetch referral link" });
+    }
+  });
+
+  // Get user's referral stats (authenticated)
+  app.get("/api/referral/stats", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const stats = await storage.getUserReferralStats(userId);
+      res.json(stats);
+    } catch (error) {
+      console.error("Error fetching referral stats:", error);
+      res.status(500).json({ message: "Failed to fetch referral stats" });
+    }
+  });
+
+  // Get referral leaderboard (public)
+  app.get("/api/referral/leaderboard", async (req, res) => {
+    try {
+      const limit = parseInt(req.query.limit as string) || 10;
+      const leaderboard = await storage.getReferralLeaderboard(limit);
+      
+      // Format for frontend with rank
+      const formattedLeaderboard = leaderboard.map((entry, index) => ({
+        rank: index + 1,
+        username: entry.username,
+        referralCount: entry.referralCount,
+      }));
+      
+      res.json(formattedLeaderboard);
+    } catch (error) {
+      console.error("Error fetching leaderboard:", error);
+      res.status(500).json({ message: "Failed to fetch leaderboard" });
+    }
+  });
+
+  // Process referral code during signup (internal use)
+  app.post("/api/referral/process", isAuthenticated, async (req: any, res) => {
+    try {
+      const inviteeId = req.user.claims.sub;
+      const { referralCode } = req.body;
+      
+      if (!referralCode) {
+        return res.status(400).json({ message: "Referral code is required" });
+      }
+
+      // Check if user was already referred
+      const alreadyReferred = await storage.hasBeenReferred(inviteeId);
+      if (alreadyReferred) {
+        return res.status(400).json({ message: "User has already been referred" });
+      }
+
+      // Find the referral code
+      const code = await storage.getReferralByCode(referralCode);
+      if (!code) {
+        return res.status(404).json({ message: "Invalid referral code" });
+      }
+
+      // Don't allow self-referral
+      if (code.userId === inviteeId) {
+        return res.status(400).json({ message: "Cannot refer yourself" });
+      }
+
+      // Create referral relationship
+      const referral = await storage.createReferral(code.userId, inviteeId, referralCode);
+      
+      res.json({
+        message: "Referral processed successfully",
+        referral,
+      });
+    } catch (error) {
+      console.error("Error processing referral:", error);
+      res.status(500).json({ message: "Failed to process referral" });
+    }
+  });
+
+  // Airdrop Routes
+  // Check airdrop eligibility
+  app.get("/api/airdrop/check", async (req: any, res) => {
+    try {
+      let userIdOrAddress: string;
+
+      // If authenticated, use userId; otherwise use query param address
+      if (req.user?.claims?.sub) {
+        userIdOrAddress = req.user.claims.sub;
+      } else if (req.query.address) {
+        userIdOrAddress = req.query.address as string;
+      } else {
+        return res.status(400).json({ message: "Address or authentication required" });
+      }
+
+      const eligibility = await storage.checkAirdropEligibility(userIdOrAddress);
+      res.json(eligibility);
+    } catch (error) {
+      console.error("Error checking airdrop eligibility:", error);
+      res.status(500).json({ message: "Failed to check airdrop eligibility" });
+    }
+  });
+
+  // Claim airdrop (authenticated)
+  app.post("/api/airdrop/claim", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const { walletAddress } = req.body;
+
+      if (!walletAddress) {
+        return res.status(400).json({ message: "Wallet address is required" });
+      }
+
+      // Verify eligibility first
+      const eligibility = await storage.checkAirdropEligibility(userId);
+      if (!eligibility.eligible) {
+        return res.status(403).json({ message: "Not eligible for airdrop" });
+      }
+
+      if (eligibility.claimed) {
+        return res.status(400).json({ message: "Airdrop already claimed" });
+      }
+
+      // Mark as claimed
+      const result = await storage.claimAirdrop(userId, walletAddress);
+      
+      // TODO: Trigger actual token distribution (via smart contract or manual process)
+      // For MVP, we just mark it as claimed in the database
+      
+      res.json({
+        message: "Airdrop claimed successfully",
+        amount: result.amount,
+        claimDate: result.claimDate,
+      });
+    } catch (error: any) {
+      console.error("Error claiming airdrop:", error);
+      res.status(500).json({ 
+        message: error.message || "Failed to claim airdrop" 
+      });
+    }
   });
 
   const httpServer = createServer(app);
