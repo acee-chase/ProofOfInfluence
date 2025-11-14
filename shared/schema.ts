@@ -94,6 +94,40 @@ export const transactions = pgTable("transactions", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+// Fiat transactions - Stripe ledger
+export const fiatTransactions = pgTable("fiat_transactions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  stripeSessionId: varchar("stripe_session_id").unique(),
+  amountFiat: integer("amount_fiat").notNull(), // in cents
+  currency: varchar("currency").default("usd").notNull(),
+  status: varchar("status").default("pending").notNull(), // pending, completed, failed, refunded
+  credits: integer("credits").default(0).notNull(), // Immortality credits granted
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// User balances - Immortality credits ledger
+export const userBalances = pgTable("user_balances", {
+  userId: varchar("user_id").primaryKey().references(() => users.id, { onDelete: "cascade" }),
+  immortalityCredits: integer("immortality_credits").default(0).notNull(),
+  poiCredits: integer("poi_credits").default(0).notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// Ledger entries for audit trail
+export const immortalityLedger = pgTable("immortality_ledger", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "cascade" }),
+  type: varchar("type").notNull(), // credit | debit
+  amountCredits: integer("amount_credits").notNull(),
+  source: varchar("source").notNull(), // stripe, manual, spend, etc.
+  reference: varchar("reference"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
 // POI Tiers - membership levels based on POI balance/staking
 export const poiTiers = pgTable("poi_tiers", {
   id: serial("id").primaryKey(),
@@ -334,6 +368,21 @@ export const insertTransactionSchema = createInsertSchema(transactions).omit({
   updatedAt: true,
 });
 
+export const insertFiatTransactionSchema = createInsertSchema(fiatTransactions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertUserBalanceSchema = createInsertSchema(userBalances).omit({
+  updatedAt: true,
+});
+
+export const insertImmortalityLedgerSchema = createInsertSchema(immortalityLedger).omit({
+  id: true,
+  createdAt: true,
+});
+
 export const insertPoiTierSchema = createInsertSchema(poiTiers).omit({
   id: true,
 });
@@ -414,6 +463,12 @@ export type Link = typeof links.$inferSelect;
 
 export type InsertTransaction = z.infer<typeof insertTransactionSchema>;
 export type Transaction = typeof transactions.$inferSelect;
+export type InsertFiatTransaction = z.infer<typeof insertFiatTransactionSchema>;
+export type FiatTransaction = typeof fiatTransactions.$inferSelect;
+export type InsertUserBalance = z.infer<typeof insertUserBalanceSchema>;
+export type UserBalance = typeof userBalances.$inferSelect;
+export type InsertImmortalityLedgerEntry = z.infer<typeof insertImmortalityLedgerSchema>;
+export type ImmortalityLedgerEntry = typeof immortalityLedger.$inferSelect;
 
 export type InsertPoiTier = z.infer<typeof insertPoiTierSchema>;
 export type PoiTier = typeof poiTiers.$inferSelect;

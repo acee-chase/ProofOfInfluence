@@ -1,6 +1,7 @@
 // Backend API routes - includes Replit Auth integration from blueprint:javascript_log_in_with_replit
 import express, { type Express, type Request } from "express";
 import { createServer, type Server } from "http";
+import { ethers } from "ethers";
 import { storage } from "./storage";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import { insertProfileSchema, insertLinkSchema } from "@shared/schema";
@@ -8,6 +9,27 @@ import { stripe } from "./stripe";
 import { registerMarketRoutes } from "./routes/market";
 import { registerReservePoolRoutes } from "./routes/reservePool";
 import { registerMerchantRoutes } from "./routes/merchant";
+
+const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
+const tgeSaleAddress =
+  process.env.TGESALE_ADDRESS ||
+  process.env.VITE_TGESALE_ADDRESS ||
+  process.env.NEXT_PUBLIC_TGESALE_ADDRESS ||
+  "";
+const tgeRpcUrl =
+  process.env.TGE_RPC_URL ||
+  process.env.BASE_RPC_URL ||
+  process.env.VITE_BASE_RPC_URL ||
+  "https://mainnet.base.org";
+const tgeProvider = new ethers.JsonRpcProvider(tgeRpcUrl);
+const tgeSaleAbi = [
+  "function purchase(uint256 usdcAmount, bytes32[] calldata proof)",
+  "function currentTier() view returns (uint256)",
+  "function tiers(uint256) view returns (uint256 pricePerToken, uint256 remainingTokens)",
+  "function minContribution() view returns (uint256)",
+  "function maxContribution() view returns (uint256)",
+  "function totalRaised() view returns (uint256)",
+];
 
 // Extend Express Request to include user
 declare global {
@@ -285,72 +307,95 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Stripe webhook endpoint - must be placed before other routes to handle raw body
-  app.post("/api/stripe-webhook", express.raw({ type: 'application/json' }), async (req: any, res) => {
-    const sig = req.headers['stripe-signature'];
+  const stripeWebhookMiddleware = express.raw({ type: "application/json" });
+
+  const handleStripeWebhook = async (req: any, res: any) => {
+    const sig = req.headers["stripe-signature"];
     const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
     if (!webhookSecret) {
-      console.warn('Warning: STRIPE_WEBHOOK_SECRET is not set. Webhook signature verification disabled.');
+      console.warn("Warning: STRIPE_WEBHOOK_SECRET is not set. Webhook signature verification disabled.");
     }
 
     let event;
 
     try {
-      // Verify webhook signature if secret is configured
       if (webhookSecret && sig) {
         event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
       } else {
-        // For development without webhook secret
         event = JSON.parse(req.body.toString());
       }
     } catch (err: any) {
-      console.error('Webhook signature verification failed:', err.message);
+      console.error("Webhook signature verification failed:", err.message);
       return res.status(400).send(`Webhook Error: ${err.message}`);
     }
 
-    // Handle the event
     try {
       switch (event.type) {
-        case 'checkout.session.completed': {
+        case "checkout.session.completed": {
           const session = event.data.object;
-          console.log('Payment successful for session:', session.id);
+          const sessionId = session.id;
+          console.log("Payment successful for session:", sessionId);
 
-          // Get transaction from database
-          const transaction = await storage.getTransactionBySessionId(session.id);
-          
+          const transaction = await storage.getTransactionBySessionId(sessionId);
           if (transaction) {
-            // Update transaction status
             await storage.updateTransaction(transaction.id, {
-              status: 'completed',
+              status: "completed",
               stripePaymentIntentId: session.payment_intent as string,
               email: session.customer_email || transaction.email || null,
             });
-            
-            console.log(`Transaction ${transaction.id} marked as completed`);
-          } else {
-            console.error(`Transaction not found for session ${session.id}`);
+          }
+
+          const fiatTx = await storage.getFiatTransactionBySessionId(sessionId);
+          if (fiatTx && fiatTx.status !== "completed") {
+            await storage.updateFiatTransaction(fiatTx.id, {
+              status: "completed",
+              metadata: {
+                ...(fiatTx.metadata || {}),
+                eventId: event.id,
+                paymentIntentId: session.payment_intent,
+              },
+            });
+
+            if (fiatTx.userId && fiatTx.credits > 0) {
+              await storage.adjustImmortalityCredits({
+                userId: fiatTx.userId,
+                credits: fiatTx.credits,
+                source: "stripe",
+                reference: sessionId,
+                metadata: {
+                  amountFiat: fiatTx.amountFiat,
+                  currency: fiatTx.currency,
+                },
+              });
+            }
           }
           break;
         }
 
-        case 'checkout.session.expired': {
+        case "checkout.session.expired":
+        case "checkout.session.async_payment_failed":
+        case "checkout.session.async_payment_expired": {
           const session = event.data.object;
-          console.log('Payment session expired:', session.id);
+          const sessionId = session.id;
+          console.log("Payment session expired/failed:", sessionId);
 
-          const transaction = await storage.getTransactionBySessionId(session.id);
-          if (transaction && transaction.status === 'pending') {
+          const transaction = await storage.getTransactionBySessionId(sessionId);
+          if (transaction && transaction.status === "pending") {
             await storage.updateTransaction(transaction.id, {
-              status: 'failed',
+              status: "failed",
             });
           }
+
+          await storage.updateFiatTransactionBySessionId(sessionId, {
+            status: "failed",
+          });
           break;
         }
 
-        case 'payment_intent.payment_failed': {
+        case "payment_intent.payment_failed": {
           const paymentIntent = event.data.object;
-          console.log('Payment failed:', paymentIntent.id);
-          // Could update transaction status here if needed
+          console.log("Payment failed:", paymentIntent.id);
           break;
         }
 
@@ -360,27 +405,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       res.json({ received: true });
     } catch (error) {
-      console.error('Error processing webhook:', error);
-      res.status(500).json({ error: 'Webhook processing failed' });
+      console.error("Error processing webhook:", error);
+      res.status(500).json({ error: "Webhook processing failed" });
     }
-  });
+  };
 
-  // Stripe payment routes
-  app.post("/api/create-checkout-session", async (req: any, res) => {
+  app.post("/api/stripe-webhook", stripeWebhookMiddleware, handleStripeWebhook);
+  app.post("/api/stripe/webhook", stripeWebhookMiddleware, handleStripeWebhook);
+
+  const createCheckoutSessionLegacy = async (req: any, res: any, requireAuth: boolean) => {
     try {
       const { amount, purpose } = req.body;
 
-      // Validate amount
       if (!amount || amount < 1 || amount > 10000) {
         return res.status(400).json({ message: "Invalid amount. Must be between $1 and $10,000" });
       }
-
-      // Validate purpose
-      if (!purpose || typeof purpose !== 'string') {
+      if (!purpose || typeof purpose !== "string") {
         return res.status(400).json({ message: "Payment purpose is required" });
       }
+      if (requireAuth && !req.user) {
+        return res.status(401).json({ message: "Authentication required" });
+      }
 
-      const baseUrl = process.env.BASE_URL || 'http://localhost:5173';
+      const baseUrl = process.env.BASE_URL || "http://localhost:5173";
       const amountInCents = Math.round(amount * 100);
       
       // Get current user if logged in
@@ -436,6 +483,87 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error creating checkout session:", error);
       res.status(500).json({ message: "Failed to create checkout session" });
+    }
+  };
+
+  // Stripe payment routes (legacy)
+  app.post("/api/create-checkout-session", async (req: any, res) => {
+    await createCheckoutSessionLegacy(req, res, false);
+  });
+
+  // Stripe payment routes (ledger-aware)
+  app.post("/api/stripe/create-checkout-session", isAuthenticated, async (req: any, res) => {
+    try {
+      const { amount, currency = "usd" } = req.body;
+      const userId = req.user.claims.sub;
+      const userEmail = req.user.claims.email;
+
+      if (!amount || amount < 1 || amount > 10000) {
+        return res.status(400).json({ message: "Amount must be between $1 and $10,000" });
+      }
+
+      const amountInCents = Math.round(amount * 100);
+      const credits = Math.round(amount);
+      const baseUrl = process.env.BASE_URL || "http://localhost:5173";
+
+      const fiatTx = await storage.createFiatTransaction({
+        userId,
+        amountFiat: amountInCents,
+        currency,
+        status: "pending",
+        credits,
+        metadata: {
+          origin: "recharge",
+        },
+        stripeSessionId: null,
+      });
+
+      const session = await stripe.checkout.sessions.create({
+        payment_method_types: ["card"],
+        customer_email: userEmail || undefined,
+        line_items: [
+          {
+            price_data: {
+              currency,
+              product_data: {
+                name: "Immortality Credits",
+                description: "Recharge credits for ProjectX Immortality services",
+              },
+              unit_amount: amountInCents,
+            },
+            quantity: 1,
+          },
+        ],
+        mode: "payment",
+        success_url: `${baseUrl}/recharge?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/recharge`,
+        metadata: {
+          fiatTransactionId: fiatTx.id,
+          userId,
+          credits: credits.toString(),
+        },
+      });
+
+      await storage.updateFiatTransaction(fiatTx.id, { stripeSessionId: session.id });
+
+      res.json({ url: session.url });
+    } catch (error) {
+      console.error("Error creating Stripe checkout session:", error);
+      res.status(500).json({ message: "Failed to create checkout session" });
+    }
+  });
+
+  app.get("/api/immortality/balance", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const balance = await storage.getUserBalance(userId);
+      res.json({
+        credits: balance?.immortalityCredits ?? 0,
+        poiCredits: balance?.poiCredits ?? 0,
+      });
+    } catch (error) {
+      console.error("Error fetching balance:", error);
+      res.status(500).json({ message: "Failed to fetch balance" });
     }
   });
 
@@ -769,6 +897,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error fetching TGE config:", error);
       res.status(500).json({ message: "Failed to fetch TGE configuration" });
+    }
+  });
+
+  app.get("/api/tge/status", async (_req, res) => {
+    try {
+      if (!tgeSaleAddress || tgeSaleAddress === ZERO_ADDRESS) {
+        return res.json({ configured: false });
+      }
+
+      const contract = new ethers.Contract(tgeSaleAddress, tgeSaleAbi, tgeProvider);
+      const [currentTier, minContribution, maxContribution, totalRaised] = await Promise.all([
+        contract.currentTier(),
+        contract.minContribution(),
+        contract.maxContribution(),
+        contract.totalRaised(),
+      ]);
+      const tierInfo = await contract.tiers(currentTier);
+
+      res.json({
+        configured: true,
+        saleAddress: tgeSaleAddress,
+        sale: {
+          currentTier: currentTier.toString(),
+          pricePerToken: tierInfo.pricePerToken.toString(),
+          remainingTokens: tierInfo.remainingTokens.toString(),
+          minContribution: minContribution.toString(),
+          maxContribution: maxContribution.toString(),
+          totalRaised: totalRaised.toString(),
+        },
+      });
+    } catch (error) {
+      console.error("Error fetching TGE status:", error);
+      res.status(500).json({ message: "Failed to fetch TGE status" });
     }
   });
 

@@ -111,15 +111,15 @@ export default function Landing() {
             </p>
 
             {/* CTA Buttons */}
-            <div className="mt-6 flex gap-3">
-              <Link href="/tge">
+            <div className="mt-6 flex gap-3 flex-wrap">
+              <Link href="/Immortality">
                 <ThemedButton emphasis>
-                  {theme === 'cyberpunk' ? 'Launch App' : 'Start Earning'}
+                  {theme === 'cyberpunk' ? 'Launch Immortality' : 'Enter Immortality'}
                 </ThemedButton>
               </Link>
-              <Link href="/solutions">
+              <Link href="/market">
                 <ThemedButton variant="outline">
-                  {theme === 'cyberpunk' ? 'Join TGE' : 'Get Early Access'}
+                  {theme === 'cyberpunk' ? 'Buy POI' : 'Go to TGESale'}
                 </ThemedButton>
               </Link>
             </div>

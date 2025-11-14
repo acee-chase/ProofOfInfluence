@@ -1,318 +1,176 @@
-import React, { useState } from "react";
+import React, { useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Section } from "@/components/layout/Section";
-import { ThemedCard, ThemedButton, ThemedInput } from "@/components/themed";
+import { ThemedCard, ThemedButton } from "@/components/themed";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import {
-  Wallet,
-  CreditCard,
-  Building2,
-  ArrowRight,
-  CheckCircle2,
-  Info,
-  Shield,
-} from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import StripePayment from "@/components/StripePayment";
+import { Shield, Wallet, Coins, ArrowRight } from "lucide-react";
 
-type PaymentMethod = "onchain" | "card" | "thirdparty";
+interface ImmortalityBalanceResponse {
+  credits: number;
+  poiCredits: number;
+}
 
 export default function Recharge() {
   const { theme } = useTheme();
   const { toast } = useToast();
+  const { isAuthenticated } = useAuth();
 
-  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("onchain");
-  const [amount, setAmount] = useState("");
-  const [loading, setLoading] = useState(false);
+  const { data: balance, refetch, isFetching } = useQuery<ImmortalityBalanceResponse>({
+    queryKey: ["/api/immortality/balance"],
+    enabled: isAuthenticated,
+  });
 
-  const paymentMethods = [
-    {
-      id: "onchain" as const,
-      icon: Wallet,
-      title: "链上支付",
-      desc: "使用加密钱包直接支付",
-      fee: "0.5%",
-    },
-    {
-      id: "card" as const,
-      icon: CreditCard,
-      title: "信用卡",
-      desc: "Visa / Mastercard / Amex",
-      fee: "2.9%",
-    },
-    {
-      id: "thirdparty" as const,
-      icon: Building2,
-      title: "第三方支付",
-      desc: "支付宝 / 微信支付",
-      fee: "1.5%",
-    },
-  ];
-
-  const calculateFee = (amt: string) => {
-    const numAmount = parseFloat(amt) || 0;
-    const feeRate = selectedMethod === "onchain" ? 0.005 
-      : selectedMethod === "card" ? 0.029 
-      : 0.015;
-    return (numAmount * feeRate).toFixed(2);
-  };
-
-  const calculateReceived = (amt: string) => {
-    const numAmount = parseFloat(amt) || 0;
-    const fee = parseFloat(calculateFee(amt));
-    // Mock POI price: $1 = 0.958 POI (considering fee)
-    return ((numAmount - fee) * 0.958).toFixed(2);
-  };
-
-  const handleSubmit = async () => {
-    if (!amount || parseFloat(amount) <= 0) {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get("session_id");
+    if (sessionId) {
       toast({
-        title: "错误",
-        description: "请输入有效金额",
-        variant: "destructive",
+        title: "充值处理中",
+        description: "Stripe 支付已完成，余额即将更新。",
       });
-      return;
+      refetch();
+      params.delete("session_id");
+      const newUrl =
+        window.location.pathname + (params.toString() ? `?${params.toString()}` : "");
+      window.history.replaceState({}, "", newUrl);
     }
+  }, [refetch, toast]);
 
-    setLoading(true);
-
-    // Simulate payment processing
-    setTimeout(() => {
-      toast({
-        title: "处理中",
-        description: "正在处理您的充值请求...",
-      });
-      
-      setTimeout(() => {
-        setLoading(false);
-        toast({
-          title: "充值成功！",
-          description: `已充值 ${calculateReceived(amount)} POI 到您的账户`,
-        });
-        setAmount("");
-      }, 2000);
-    }, 1000);
-  };
+  const credits = balance?.credits ?? 0;
 
   return (
     <PageLayout>
-      {/* Header */}
       <Section>
-        <div className="max-w-4xl mx-auto">
-          <h1 className={cn(
-            'text-2xl font-bold text-center mb-2',
-            theme === 'cyberpunk' ? 'font-orbitron text-cyan-100' : 'font-fredoka text-slate-900'
+        <div className="max-w-4xl mx-auto text-center space-y-4">
+          <p className={cn(
+            "text-xs uppercase tracking-widest opacity-70",
+            theme === "cyberpunk" ? "text-cyan-300" : "text-slate-500"
           )}>
-            Recharge
-          </h1>
-          <p className="text-center text-sm opacity-70 mb-8">
-            添加资金到您的 ProofOfInfluence 账户
+            Immortality Plan · Layer 2
           </p>
-
-          {/* Step Indicator */}
-          <div className="flex items-center justify-center gap-2 mb-8">
-            {["选择方式", "输入金额", "确认"].map((step, index) => (
-              <React.Fragment key={step}>
-                <div className="flex items-center gap-2">
-                  <div className={cn(
-                    'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold',
-                    theme === 'cyberpunk'
-                      ? 'bg-cyan-400/20 text-cyan-300 border border-cyan-400/40'
-                      : 'bg-blue-100 text-blue-600 border border-blue-300'
-                  )}>
-                    {index + 1}
+          <h1 className={cn(
+            "text-3xl font-bold",
+            theme === "cyberpunk" ? "font-orbitron text-cyan-100" : "font-fredoka text-slate-900"
+          )}>
+            Recharge Immortality Credits
+          </h1>
+          <p className="text-sm opacity-80">
+            使用法币充值，获得 Immortality Credits。Credits 会记录在中心化账本中，
+            可在 Roblox / AgentKit / ProjectX 中消费或兑换成 POI。
+          </p>
                   </div>
-                  <span className="text-sm hidden md:inline">{step}</span>
+      </Section>
+
+      <Section title="Immortality Balance" subtitle="中心化账本用于记录法币 inflow，未来可兑换 POI">
+        <div className="grid gap-4 lg:grid-cols-2">
+          <ThemedCard className="p-6 space-y-4">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-xs uppercase tracking-widest opacity-70">Current Balance</p>
+                <div className="text-3xl font-bold">
+                  {credits.toLocaleString()} 点
+                  {isFetching && <span className="ml-2 text-xs opacity-70">刷新中…</span>}
                 </div>
-                {index < 2 && (
-                  <div className={cn(
-                    'w-8 h-0.5',
-                    theme === 'cyberpunk' ? 'bg-cyan-400/30' : 'bg-slate-200'
-                  )} />
-                )}
-              </React.Fragment>
-            ))}
           </div>
-
-          {/* Payment Methods */}
-          <div className="grid gap-4 md:grid-cols-3 mb-6">
-            {paymentMethods.map((method) => {
-              const Icon = method.icon;
-              const isSelected = selectedMethod === method.id;
-
-              return (
-                <ThemedCard
-                  key={method.id}
-                  hover
-                  className={cn(
-                    'p-5 cursor-pointer transition-all',
-                    isSelected &&
-                    (theme === 'cyberpunk'
-                      ? 'border-2 border-cyan-400/50 bg-cyan-400/10'
-                      : 'border-2 border-blue-500 bg-blue-50')
-                  )}
-                  onClick={() => setSelectedMethod(method.id)}
-                >
-                  <div className="flex items-start justify-between mb-3">
-                    <Icon className={cn(
-                      'w-8 h-8',
-                      isSelected
-                        ? theme === 'cyberpunk'
-                          ? 'text-cyan-300'
-                          : 'text-blue-600'
-                        : 'opacity-50'
-                    )} />
-                    {isSelected && (
-                      <CheckCircle2 className={cn(
-                        'w-5 h-5',
-                        theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
-                      )} />
-                    )}
+              <Coins className="w-10 h-10 text-primary" />
                   </div>
-
-                  <h4 className="font-bold mb-1">{method.title}</h4>
-                  <p className="text-xs opacity-70 mb-2">{method.desc}</p>
-                  <div className="text-xs">
-                    <span className="opacity-70">手续费: </span>
-                    <span className={cn(
-                      'font-semibold',
-                      theme === 'cyberpunk' ? 'text-pink-300' : 'text-green-600'
-                    )}>
-                      {method.fee}
-                    </span>
-                  </div>
+            <p className="text-sm opacity-80">
+              Credits = Layer 2 余额。它们暂存在中心化账本，方便对账 / 合规，也能在未来转换成 POI 或直接用于
+              Immortality 服务。
+            </p>
+            <p className="text-xs opacity-60">
+              未取得牌照之前我们不会直接发 POI。Credits 可审计、可退款，也能在法币/链上之间灵活切换。
+            </p>
                 </ThemedCard>
-              );
-            })}
-          </div>
 
-          {/* Amount Input */}
-          <ThemedCard className="p-6 mb-6">
-            <h3 className={cn(
-              'text-lg font-bold mb-4',
-              theme === 'cyberpunk' ? 'font-rajdhani text-cyan-200' : 'font-poppins text-slate-900'
-            )}>
-              输入金额
+          <ThemedCard className="p-6 space-y-3">
+            <h3 className="text-lg font-semibold flex items-center gap-2">
+              <Shield className="w-4 h-4" />
+              Ledger 原则
             </h3>
+            <p className="text-sm opacity-80">
+              1) 每笔 Stripe 充值都会写入 `fiat_transactions` 与 `user_balances`；<br />
+              2) Ledger 是审计与退款的唯一来源；<br />
+              3) 未来兑换 POI 时，会参考 Ledger 数据进行结算。
+            </p>
+          </ThemedCard>
+                </div>
+      </Section>
 
-            <ThemedInput
-              type="number"
-              placeholder="100.00"
-              value={amount}
-              onChange={(e) => setAmount(e.target.value)}
-              label="USD"
-              helperText="最小充值金额: $10"
-            />
-
-            {/* Calculation Summary */}
-            {amount && parseFloat(amount) > 0 && (
-              <div className={cn(
-                'mt-4 p-4 rounded-lg space-y-2',
-                theme === 'cyberpunk'
-                  ? 'bg-slate-900/60 border border-cyan-400/20'
-                  : 'bg-slate-50 border border-slate-200'
-              )}>
-                <div className="flex justify-between text-sm">
-                  <span className="opacity-70">充值金额</span>
-                  <span className="font-medium">${amount}</span>
-                </div>
-                <div className="flex justify-between text-sm">
-                  <span className="opacity-70">手续费</span>
-                  <span className={cn(
-                    'font-medium',
-                    theme === 'cyberpunk' ? 'text-pink-300' : 'text-orange-600'
-                  )}>
-                    -${calculateFee(amount)}
-                  </span>
-                </div>
-                <div className={cn(
-                  'pt-2 border-t flex justify-between',
-                  theme === 'cyberpunk' ? 'border-cyan-400/20' : 'border-slate-200'
-                )}>
-                  <span className="font-semibold">预计到账</span>
-                  <span className={cn(
-                    'text-lg font-bold',
-                    theme === 'cyberpunk' ? 'text-green-400' : 'text-green-600'
-                  )}>
-                    {calculateReceived(amount)} POI
-                  </span>
-                </div>
-              </div>
+      <Section title="使用 Stripe 充值" subtitle="信用卡 / Apple Pay / Google Pay">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ThemedCard className="p-6">
+            <StripePayment disabled={!isAuthenticated} />
+            {!isAuthenticated && (
+              <p className="text-xs text-center text-red-500 mt-3">请先登录账户再进行充值。</p>
             )}
           </ThemedCard>
 
-          {/* Security Note */}
-          <ThemedCard className={cn(
-            'p-4 mb-6',
-            theme === 'cyberpunk'
-              ? 'bg-cyan-400/10 border border-cyan-400/30'
-              : 'bg-blue-50 border border-blue-200'
-          )}>
-            <div className="flex items-start gap-3">
-              <Shield className={cn(
-                'w-5 h-5 mt-0.5 flex-shrink-0',
-                theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
-              )} />
-              <div className="text-sm">
-                <div className="font-semibold mb-1">安全保障</div>
-                <p className="opacity-80 text-xs">
-                  我们使用行业领先的加密技术保护您的交易。所有支付信息均经过 SSL 加密传输。
-                </p>
+          <ThemedCard className="p-6 space-y-3">
+            <div className="flex items-center gap-2">
+              <Wallet className="w-5 h-5" />
+              <h3 className="font-semibold">操作步骤</h3>
               </div>
+            <ol className="list-decimal list-inside space-y-2 text-sm opacity-80">
+              <li>输入金额并跳转 Stripe Checkout（当前可使用测试卡）。</li>
+              <li>支付完成返回 `/recharge`，系统根据 session_id 自动刷新余额。</li>
+              <li>Credits 立即可用：可在 Immortality 体验中消费，或稍后兑换 POI。</li>
+            </ol>
+            <div className="text-xs opacity-60">
+              Webhook 会把每笔 session 写入 `fiat_transactions`、`user_balances`、`immortality_ledger`，方便审计。
             </div>
           </ThemedCard>
-
-          {/* Submit Button */}
-          <ThemedButton
-            emphasis
-            size="lg"
-            className="w-full"
-            onClick={handleSubmit}
-            disabled={loading || !amount || parseFloat(amount) <= 0}
-          >
-            {loading ? "处理中..." : "确认充值"}
-            {!loading && <ArrowRight className="w-5 h-5 ml-2" />}
-          </ThemedButton>
-
-          {/* Additional Info */}
-          <div className={cn(
-            'mt-6 text-center text-xs opacity-70',
-            theme === 'cyberpunk' ? 'font-rajdhani' : 'font-poppins'
-          )}>
-            <Info className="w-4 h-4 inline-block mr-1" />
-            充值通常在 5-10 分钟内到账。如有问题请联系客服。
-          </div>
         </div>
       </Section>
 
-      {/* FAQ */}
-      <Section title="常见问题" subtitle="关于充值的常见问题">
+      <Section title="链上购买（Layer 1）">
+        <ThemedCard className="p-6 flex flex-col gap-4 md:flex-row md:items-center">
+          <div className="flex-1 space-y-2">
+            <h3 className="text-lg font-semibold">已经有钱包和 USDC？</h3>
+            <p className="text-sm opacity-80">
+              前往 <span className="font-semibold">Market → TGE Purchase</span> 使用 Base 网络上的
+              USDC 直接购买 POI。链上用户无需经过中心化账本。
+            </p>
+          </div>
+          <ThemedButton asChild emphasis>
+            <a href="/market">
+              去购买 POI
+              <ArrowRight className="w-4 h-4 ml-2" />
+            </a>
+          </ThemedButton>
+        </ThemedCard>
+      </Section>
+
+      <Section title="常见问题" subtitle="Immortality Credits 与法币路径">
         <div className="grid gap-4 md:grid-cols-2 max-w-4xl mx-auto">
-          <ThemedCard className="p-5">
-            <h4 className="font-bold mb-2">最小充值金额是多少？</h4>
+          <ThemedCard className="p-5 space-y-2">
+            <h4 className="font-bold">Stripe 测试模式</h4>
             <p className="text-sm opacity-80">
-              最小充值金额为 $10。建议首次充值不少于 $50 以获得更好的体验。
+              在 `.env` 中设置 `STRIPE_SECRET_KEY`（test）和 `STRIPE_WEBHOOK_SECRET`，使用
+              4242 4242 4242 4242 卡号即可跑通全流程。
             </p>
           </ThemedCard>
-
-          <ThemedCard className="p-5">
-            <h4 className="font-bold mb-2">充值需要多长时间？</h4>
+          <ThemedCard className="p-5 space-y-2">
+            <h4 className="font-bold">Credits 与 POI 的兑换</h4>
             <p className="text-sm opacity-80">
-              链上支付通常在 5-10 分钟内到账。信用卡和第三方支付通常即时到账。
+              MVP 阶段 1 Credit ≈ 1 USD。未来会提供“兑换 POI”按钮，或在 Immortality 服务内直接扣减。
             </p>
           </ThemedCard>
-
-          <ThemedCard className="p-5">
-            <h4 className="font-bold mb-2">支持哪些支付方式？</h4>
+          <ThemedCard className="p-5 space-y-2">
+            <h4 className="font-bold">数据如何导出？</h4>
             <p className="text-sm opacity-80">
-              我们支持加密钱包、信用卡（Visa/Mastercard/Amex）以及支付宝/微信支付。
+              数据保存在 `fiat_transactions`、`user_balances`、`immortality_ledger` 表，可直接用 SQL 或 BI 工具分析。
             </p>
           </ThemedCard>
-
-          <ThemedCard className="p-5">
-            <h4 className="font-bold mb-2">手续费如何计算？</h4>
+          <ThemedCard className="p-5 space-y-2">
+            <h4 className="font-bold">支付失败怎么办？</h4>
             <p className="text-sm opacity-80">
-              链上支付 0.5%，信用卡 2.9%，第三方支付 1.5%。所有费用在充值前明确显示。
+              失败 / 过期的 session 会被标记为 failed，不会增加 Credits。可直接重新发起一次支付。
             </p>
           </ThemedCard>
         </div>

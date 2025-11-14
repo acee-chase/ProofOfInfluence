@@ -29,13 +29,13 @@ export default function Header({ lang = "zh" }: HeaderProps) {
         { label: "首页", href: "/" },
         { label: "现货交易", href: "/app/market", icon: ShoppingCart, highlight: true },
         { label: "RWA市场", href: "/app", icon: Briefcase },
-        { label: "ProjectX", href: "/products" },
+        { label: "Immortality", href: "/immortality" },
       ]
     : [
         { label: "Home", href: "/" },
         { label: "Spot Trading", href: "/app/market", icon: ShoppingCart, highlight: true },
         { label: "RWA Market", href: "/app", icon: Briefcase },
-        { label: "ProjectX", href: "/products" },
+        { label: "Immortality", href: "/immortality" },
       ];
 
   // Resources dropdown items
@@ -142,7 +142,7 @@ export default function Header({ lang = "zh" }: HeaderProps) {
 
           {/* projectX / Login Link */}
           {isAuthenticated ? (
-            <Link href="/app">
+            <Link href="/immortality">
               <Button
                 variant="default"
                 className="bg-white text-slate-900 hover:bg-slate-100"

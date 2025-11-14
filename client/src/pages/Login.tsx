@@ -30,7 +30,7 @@ export default function Login() {
     // Simulate login
     setTimeout(() => {
       setLoading(false);
-      setLocation("/app");
+      setLocation("/Immortality");
     }, 1500);
   };
 

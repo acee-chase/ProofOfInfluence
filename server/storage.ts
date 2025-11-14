@@ -4,6 +4,9 @@ import {
   profiles,
   links,
   transactions,
+  fiatTransactions,
+  userBalances,
+  immortalityLedger,
   poiTiers,
   poiFeeCredits,
   poiBurnIntents,
@@ -32,6 +35,12 @@ import {
   type InsertLink,
   type Transaction,
   type InsertTransaction,
+  type FiatTransaction,
+  type InsertFiatTransaction,
+  type UserBalance,
+  type InsertUserBalance,
+  type ImmortalityLedgerEntry,
+  type InsertImmortalityLedgerEntry,
   type PoiTier,
   type InsertPoiTier,
   type PoiFeeCredit,
@@ -107,6 +116,21 @@ export interface IStorage {
   getTransactionBySessionId(sessionId: string): Promise<Transaction | undefined>;
   updateTransaction(id: string, updates: Partial<InsertTransaction>): Promise<Transaction>;
   getUserTransactions(userId: string): Promise<Transaction[]>;
+  createFiatTransaction(transaction: InsertFiatTransaction): Promise<FiatTransaction>;
+  getFiatTransactionBySessionId(sessionId: string): Promise<FiatTransaction | undefined>;
+  updateFiatTransaction(id: string, updates: Partial<InsertFiatTransaction>): Promise<FiatTransaction>;
+  updateFiatTransactionBySessionId(
+    sessionId: string,
+    updates: Partial<InsertFiatTransaction>,
+  ): Promise<FiatTransaction | undefined>;
+  getUserBalance(userId: string): Promise<UserBalance | undefined>;
+  adjustImmortalityCredits(params: {
+    userId: string;
+    credits: number;
+    source: string;
+    reference?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<{ balance: UserBalance; ledger: ImmortalityLedgerEntry }>;
   
   // POI Tier operations
   getAllTiers(): Promise<PoiTier[]>;
@@ -373,6 +397,82 @@ export class DatabaseStorage implements IStorage {
       .from(transactions)
       .where(eq(transactions.userId, userId))
       .orderBy(desc(transactions.createdAt));
+  }
+
+  async createFiatTransaction(transaction: InsertFiatTransaction): Promise<FiatTransaction> {
+    const [row] = await db.insert(fiatTransactions).values(transaction).returning();
+    return row;
+  }
+
+  async updateFiatTransaction(id: string, updates: Partial<InsertFiatTransaction>): Promise<FiatTransaction> {
+    const [row] = await db
+      .update(fiatTransactions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(fiatTransactions.id, id))
+      .returning();
+    return row;
+  }
+
+  async getFiatTransactionBySessionId(sessionId: string): Promise<FiatTransaction | undefined> {
+    const [row] = await db.select().from(fiatTransactions).where(eq(fiatTransactions.stripeSessionId, sessionId));
+    return row;
+  }
+
+  async updateFiatTransactionBySessionId(
+    sessionId: string,
+    updates: Partial<InsertFiatTransaction>,
+  ): Promise<FiatTransaction | undefined> {
+    const [row] = await db
+      .update(fiatTransactions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(fiatTransactions.stripeSessionId, sessionId))
+      .returning();
+    return row;
+  }
+
+  async getUserBalance(userId: string): Promise<UserBalance | undefined> {
+    const [balance] = await db.select().from(userBalances).where(eq(userBalances.userId, userId));
+    return balance;
+  }
+
+  async adjustImmortalityCredits(params: {
+    userId: string;
+    credits: number;
+    source: string;
+    reference?: string;
+    metadata?: Record<string, unknown>;
+  }): Promise<{ balance: UserBalance; ledger: ImmortalityLedgerEntry }> {
+    const { userId, credits, source, reference, metadata } = params;
+    const [balance] = await db
+      .insert(userBalances)
+      .values({
+        userId,
+        immortalityCredits: credits,
+        poiCredits: 0,
+        updatedAt: new Date(),
+      })
+      .onConflictDoUpdate({
+        target: userBalances.userId,
+        set: {
+          immortalityCredits: sql`${userBalances.immortalityCredits} + ${credits}`,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    const [ledger] = await db
+      .insert(immortalityLedger)
+      .values({
+        userId,
+        type: credits >= 0 ? "credit" : "debit",
+        amountCredits: Math.abs(credits),
+        source,
+        reference: reference || null,
+        metadata: metadata ?? null,
+      })
+      .returning();
+
+    return { balance, ledger };
   }
 
   // POI Tier operations

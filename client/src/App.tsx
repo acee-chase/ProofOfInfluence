@@ -21,6 +21,7 @@ import Referral from "@/pages/Referral";
 import Airdrop from "@/pages/Airdrop";
 import Solutions from "@/pages/Solutions";
 import Token from "@/pages/Token";
+import Immortality from "@/pages/Immortality";
 import About from "@/pages/About";
 import NotFound from "@/pages/not-found";
 
@@ -67,12 +68,15 @@ function Router() {
       <Route path="/app/settings" component={Profile} />
       <Route path="/app/recharge" component={Recharge} />
       <Route path="/app/market" component={Market} />
+      <Route path="/app/immortality" component={Immortality} />
+      <Route path="/immortality" component={Immortality} />
       <Route path="/payment-success" component={PaymentSuccess} />
       
       {/* Legacy App Routes (redirect for backwards compatibility) */}
       <Route path="/dashboard" component={Dashboard} />
       <Route path="/profile" component={Profile} />
       <Route path="/recharge" component={Recharge} />
+      <Route path="/projectx" component={Immortality} />
       <Route path="/trading" component={Market} />
       
       {/* Dynamic User Profiles */}
