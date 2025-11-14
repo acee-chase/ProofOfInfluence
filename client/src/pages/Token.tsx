@@ -1,281 +1,314 @@
-import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
-import POITokenPrice from "@/components/POITokenPrice";
+import React from "react";
+import { Link } from "wouter";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { Section } from "@/components/layout/Section";
+import { ThemedCard, ThemedButton, ThemedProgress } from "@/components/themed";
+import { useTheme } from "@/contexts/ThemeContext";
+import { cn } from "@/lib/utils";
 import {
   Coins,
-  FileText,
+  PieChart,
   TrendingUp,
-  Code,
-  Download,
-  ExternalLink,
-  Shield,
+  Lock,
   Users,
   Zap,
+  Shield,
+  Gift,
+  Vote,
+  DollarSign,
+  Rocket,
 } from "lucide-react";
 
 export default function Token() {
-  const [activeSection, setActiveSection] = useState("overview");
+  const { theme } = useTheme();
 
-  const sections = [
-    { id: "overview", label: "概述", icon: Coins },
-    { id: "whitepaper", label: "白皮书", icon: FileText },
-    { id: "tokenomics", label: "代币经济学", icon: TrendingUp },
-    { id: "technical", label: "技术文档", icon: Code },
+  // Token distribution
+  const distribution = [
+    { label: "生态发展", value: 28, color: theme === 'cyberpunk' ? 'cyan' : 'blue' },
+    { label: "投资者", value: 20, color: theme === 'cyberpunk' ? 'pink' : 'green' },
+    { label: "团队", value: 15, color: theme === 'cyberpunk' ? 'purple' : 'purple' },
+    { label: "做市商", value: 12, color: theme === 'cyberpunk' ? 'green' : 'orange' },
+    { label: "流动性池", value: 25, color: theme === 'cyberpunk' ? 'yellow' : 'red' },
+  ];
+
+  // Token utilities
+  const utilities = [
+    {
+      icon: DollarSign,
+      title: "支付与折扣",
+      desc: "使用 $POI 支付平台服务费，享受专属折扣",
+      examples: ["手续费折扣 20%", "VIP 会员权益", "优先服务"],
+    },
+    {
+      icon: Gift,
+      title: "激励与奖励",
+      desc: "完成任务、推荐好友获得 $POI 代币奖励",
+      examples: ["每日任务奖励", "推荐返利", "创作者激励"],
+    },
+    {
+      icon: Vote,
+      title: "治理与权限",
+      desc: "持有 $POI 参与平台治理，决定发展方向",
+      examples: ["提案投票", "参数调整", "功能优先级"],
+    },
+  ];
+
+  // Key metrics
+  const metrics = [
+    { label: "总供应量", value: "1,000,000,000", unit: "POI" },
+    { label: "初始流通", value: "100,000,000", unit: "POI (10%)" },
+    { label: "TGE 价格", value: "$0.05", unit: "USDC/POI" },
+    { label: "市值 (FDV)", value: "$50,000,000", unit: "at TGE" },
+  ];
+
+  // Vesting schedule
+  const vestingSchedule = [
+    { category: "TGE 公开发售", unlock: "15% TGE unlock, 3 months linear" },
+    { category: "团队", unlock: "12 months cliff, 36 months linear" },
+    { category: "投资者", unlock: "6 months cliff, 24 months linear" },
+    { category: "生态发展", unlock: "5% quarterly unlock over 5 years" },
   ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
-      <Header lang="zh" />
-
-      {/* Hero */}
-      <section className="relative overflow-hidden bg-gradient-to-b from-[#0f1015] to-[#0a0a0f]">
-        <div className="absolute inset-0 bg-[length:40px_40px] opacity-10"
-          style={{
-            backgroundImage: 'linear-gradient(rgba(0, 240, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 240, 255, 0.1) 1px, transparent 1px)'
-          }}
-        />
-
-        <div className="relative max-w-7xl mx-auto px-4 py-16">
-          <div className="text-center space-y-6">
-            <Badge className="bg-neon-cyan/10 text-neon-cyan border-neon-cyan/30 font-rajdhani font-bold px-4 py-1">
-              $POI TOKEN
-            </Badge>
-            
-            <h1 className="text-5xl md:text-6xl font-orbitron font-bold">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-neon-cyan to-neon-purple">
-                POI 代币文档
-              </span>
-            </h1>
-
-            {/* Token Price Display */}
-            <div className="py-6">
-              <POITokenPrice />
-            </div>
-
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              Proof of Influence 生态系统的核心价值载体
-            </p>
+    <PageLayout>
+      {/* Hero Section */}
+      <Section>
+        <div className="text-center max-w-3xl mx-auto mb-12">
+          <div className="flex justify-center mb-4">
+            <Coins className={cn(
+              'w-16 h-16',
+              theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
+            )} />
           </div>
+          <h1 className={cn(
+            'text-3xl md:text-5xl font-extrabold mb-4',
+            theme === 'cyberpunk' ? 'font-orbitron' : 'font-fredoka'
+          )}>
+            $POI Token
+          </h1>
+          <p className={cn(
+            'text-lg opacity-80',
+            theme === 'cyberpunk' ? 'text-slate-300' : 'text-slate-600'
+          )}>
+            ProofOfInfluence 生态系统的价值载体和治理代币
+          </p>
         </div>
-      </section>
 
-      {/* Main Content */}
-      <section className="max-w-7xl mx-auto px-4 py-16">
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Sidebar Navigation */}
-          <aside className="lg:w-64 flex-shrink-0">
-            <Card className="p-4 bg-[#1a1a24]/60 border-neon-cyan/20 rounded-sm backdrop-blur-sm lg:sticky lg:top-24">
-              <nav className="space-y-2">
-                {sections.map((section) => {
-                  const Icon = section.icon;
-                  const isActive = activeSection === section.id;
-                  return (
-                    <button
-                      key={section.id}
-                      onClick={() => setActiveSection(section.id)}
-                      className={`w-full flex items-center gap-3 px-4 py-3 rounded-sm font-rajdhani font-bold transition-all ${
-                        isActive
-                          ? 'bg-neon-cyan/20 text-neon-cyan border-l-2 border-neon-cyan'
-                          : 'text-gray-400 hover:text-white hover:bg-white/5'
-                      }`}
-                    >
-                      <Icon className="w-5 h-5" />
-                      <span>{section.label}</span>
-                    </button>
-                  );
-                })}
-              </nav>
-            </Card>
-          </aside>
-
-          {/* Content Area */}
-          <div className="flex-1">
-            {activeSection === "overview" && (
-              <div className="prose prose-invert max-w-none">
-                <Card className="p-8 bg-[#1a1a24]/60 border-neon-cyan/20 rounded-sm backdrop-blur-sm">
-                  <h2 className="text-3xl font-orbitron font-bold text-white mb-6">
-                    $POI 代币概述
-                  </h2>
-                  
-                  <div className="space-y-6 text-gray-300 leading-relaxed">
-                    <p>
-                      POI (Proof of Influence) 是 ACEE Ventures 生态系统的原生功能型代币，
-                      旨在将社交影响力转化为可量化、可交易的数字资产。
-                    </p>
-
-                    <div className="grid md:grid-cols-2 gap-6 not-prose">
-                      <div className="p-6 bg-black/30 border border-neon-cyan/20 rounded-sm">
-                        <div className="text-neon-cyan font-rajdhani font-bold mb-2">代币标准</div>
-                        <div className="text-white text-2xl font-bold">ERC-20</div>
-                      </div>
-                      <div className="p-6 bg-black/30 border border-neon-purple/20 rounded-sm">
-                        <div className="text-neon-purple font-rajdhani font-bold mb-2">总供应量</div>
-                        <div className="text-white text-2xl font-bold">1,000,000,000</div>
-                      </div>
-                      <div className="p-6 bg-black/30 border border-neon-pink/20 rounded-sm">
-                        <div className="text-neon-pink font-rajdhani font-bold mb-2">区块链</div>
-                        <div className="text-white text-2xl font-bold">Base</div>
-                      </div>
-                      <div className="p-6 bg-black/30 border border-neon-green/20 rounded-sm">
-                        <div className="text-neon-green font-rajdhani font-bold mb-2">合约审计</div>
-                        <div className="text-white text-2xl font-bold">已完成</div>
-                      </div>
-                    </div>
-
-                    <h3 className="text-2xl font-orbitron font-bold text-white mt-8 mb-4">
-                      核心功能
-                    </h3>
-                    <ul className="space-y-3">
-                      <li className="flex items-start gap-3">
-                        <CheckCircle2 className="w-5 h-5 text-neon-cyan mt-1 flex-shrink-0" />
-                        <span>平台治理：代币持有者参与平台决策和生态发展方向</span>
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <CheckCircle2 className="w-5 h-5 text-neon-cyan mt-1 flex-shrink-0" />
-                        <span>手续费折扣：持有 POI 可享受交易手续费优惠</span>
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <CheckCircle2 className="w-5 h-5 text-neon-cyan mt-1 flex-shrink-0" />
-                        <span>质押奖励：质押 POI 获得平台手续费分成</span>
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <CheckCircle2 className="w-5 h-5 text-neon-cyan mt-1 flex-shrink-0" />
-                        <span>创作者激励：用于奖励优质内容创作者和社区贡献者</span>
-                      </li>
-                    </ul>
-                  </div>
-                </Card>
+        {/* Key Metrics */}
+        <div className="grid gap-4 md:grid-cols-4">
+          {metrics.map((metric) => (
+            <ThemedCard key={metric.label} className="p-5 text-center">
+              <div className="text-xs opacity-70 mb-2">{metric.label}</div>
+              <div className={cn(
+                'text-xl md:text-2xl font-bold mb-1',
+                theme === 'cyberpunk' ? 'font-orbitron text-cyan-300' : 'font-poppins text-blue-600'
+              )}>
+                {metric.value}
               </div>
-            )}
-
-            {activeSection === "whitepaper" && (
-              <Card className="p-8 bg-[#1a1a24]/60 border-neon-purple/20 rounded-sm backdrop-blur-sm">
-                <div className="flex items-center justify-between mb-6">
-                  <h2 className="text-3xl font-orbitron font-bold text-white">
-                    POI 白皮书
-                  </h2>
-                  <Button className="bg-neon-purple/20 border border-neon-purple text-neon-purple hover:bg-neon-purple/30">
-                    <Download className="w-4 h-4 mr-2" />
-                    下载 PDF
-                  </Button>
-                </div>
-                
-                <div className="prose prose-invert max-w-none">
-                  <p className="text-gray-300 leading-relaxed">
-                    完整的技术白皮书将详细介绍 POI 代币的经济模型、技术架构、
-                    应用场景和生态规划。文档持续更新中...
-                  </p>
-                  <Button variant="outline" className="mt-4 border-neon-purple text-neon-purple">
-                    <ExternalLink className="w-4 h-4 mr-2" />
-                    在线阅读完整版
-                  </Button>
-                </div>
-              </Card>
-            )}
-
-            {activeSection === "tokenomics" && (
-              <Card className="p-8 bg-[#1a1a24]/60 border-neon-pink/20 rounded-sm backdrop-blur-sm">
-                <h2 className="text-3xl font-orbitron font-bold text-white mb-6">
-                  代币经济学
-                </h2>
-                
-                <div className="space-y-8">
-                  <div>
-                    <h3 className="text-xl font-orbitron font-bold text-neon-pink mb-4">
-                      代币分配
-                    </h3>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                      {[
-                        { label: "社区奖励", percent: "40%", color: "neon-cyan" },
-                        { label: "团队与顾问", percent: "20%", color: "neon-purple" },
-                        { label: "生态发展", percent: "25%", color: "neon-pink" },
-                        { label: "流动性", percent: "15%", color: "neon-green" },
-                      ].map((item, idx) => (
-                        <div key={idx} className={`p-4 bg-black/30 border border-${item.color}/20 rounded-sm text-center`}>
-                          <div className={`text-${item.color} text-2xl font-bold mb-1`}>
-                            {item.percent}
-                          </div>
-                          <div className="text-gray-400 text-sm">{item.label}</div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-xl font-orbitron font-bold text-neon-pink mb-4">
-                      释放计划
-                    </h3>
-                    <ul className="space-y-3 text-gray-300">
-                      <li className="flex items-start gap-3">
-                        <Zap className="w-5 h-5 text-neon-cyan mt-1" />
-                        <span>TGE 时释放 10% 流通供应</span>
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <Zap className="w-5 h-5 text-neon-cyan mt-1" />
-                        <span>团队代币锁定 12 个月，之后 24 个月线性释放</span>
-                      </li>
-                      <li className="flex items-start gap-3">
-                        <Zap className="w-5 h-5 text-neon-cyan mt-1" />
-                        <span>社区奖励根据生态发展需求动态释放</span>
-                      </li>
-                    </ul>
-                  </div>
-                </div>
-              </Card>
-            )}
-
-            {activeSection === "technical" && (
-              <Card className="p-8 bg-[#1a1a24]/60 border-neon-green/20 rounded-sm backdrop-blur-sm">
-                <h2 className="text-3xl font-orbitron font-bold text-white mb-6">
-                  技术文档
-                </h2>
-                
-                <div className="space-y-6">
-                  <div className="p-6 bg-black/30 border border-neon-green/20 rounded-sm">
-                    <div className="flex items-center justify-between mb-4">
-                      <h3 className="text-xl font-orbitron font-bold text-neon-green">
-                        智能合约
-                      </h3>
-                      <Badge className="bg-neon-green/20 text-neon-green border-neon-green/30">
-                        已部署
-                      </Badge>
-                    </div>
-                    <div className="space-y-2 text-gray-400 font-mono text-sm">
-                      <div>合约地址: 0x...</div>
-                      <div>区块链: Base Mainnet</div>
-                      <div>标准: ERC-20</div>
-                    </div>
-                    <Button variant="outline" className="mt-4 border-neon-green text-neon-green hover:bg-neon-green/10">
-                      <ExternalLink className="w-4 h-4 mr-2" />
-                      在 Basescan 查看
-                    </Button>
-                  </div>
-
-                  <div className="grid md:grid-cols-2 gap-4">
-                    <div className="p-4 bg-black/20 border border-gray-700 rounded-sm">
-                      <Shield className="w-8 h-8 text-neon-cyan mb-3" />
-                      <h4 className="font-rajdhani font-bold text-white mb-2">安全审计</h4>
-                      <p className="text-gray-400 text-sm">合约已通过第三方安全审计</p>
-                    </div>
-                    <div className="p-4 bg-black/20 border border-gray-700 rounded-sm">
-                      <Users className="w-8 h-8 text-neon-purple mb-3" />
-                      <h4 className="font-rajdhani font-bold text-white mb-2">开源代码</h4>
-                      <p className="text-gray-400 text-sm">源代码已在 GitHub 公开</p>
-                    </div>
-                  </div>
-                </div>
-              </Card>
-            )}
-          </div>
+              <div className="text-xs opacity-60">{metric.unit}</div>
+            </ThemedCard>
+          ))}
         </div>
-      </section>
+      </Section>
 
-      <Footer lang="zh" />
-    </div>
+      {/* Token Distribution */}
+      <Section title="代币分配" subtitle="$POI 代币分配结构">
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Pie Chart Visualization */}
+          <ThemedCard className="p-6">
+            <div className="space-y-3">
+              {distribution.map((item) => (
+                <div key={item.label}>
+                  <div className="flex justify-between mb-2 text-sm">
+                    <span className="font-medium">{item.label}</span>
+                    <span className={cn(
+                      'font-bold',
+                      theme === 'cyberpunk' ? 'text-cyan-300' : 'text-blue-600'
+                    )}>
+                      {item.value}%
+                    </span>
+                  </div>
+                  <ThemedProgress value={item.value} animated />
+                </div>
+              ))}
+            </div>
+          </ThemedCard>
+
+          {/* Distribution Details */}
+          <ThemedCard className="p-6">
+            <h4 className={cn(
+              'font-bold mb-4 flex items-center gap-2',
+              theme === 'cyberpunk' ? 'font-rajdhani text-cyan-200' : 'font-poppins text-slate-900'
+            )}>
+              <PieChart className="w-5 h-5" />
+              分配说明
+            </h4>
+
+            <div className="space-y-3 text-sm">
+              <div>
+                <div className="font-semibold mb-1">生态发展 (28%)</div>
+                <p className="opacity-80">用于平台开发、营销推广和社区建设</p>
+              </div>
+              <div>
+                <div className="font-semibold mb-1">投资者 (20%)</div>
+                <p className="opacity-80">早期投资者和战略合作伙伴</p>
+              </div>
+              <div>
+                <div className="font-semibold mb-1">团队 (15%)</div>
+                <p className="opacity-80">核心团队和顾问激励</p>
+              </div>
+              <div>
+                <div className="font-semibold mb-1">做市商 (12%)</div>
+                <p className="opacity-80">保证二级市场流动性</p>
+              </div>
+              <div>
+                <div className="font-semibold mb-1">流动性池 (25%)</div>
+                <p className="opacity-80">DEX 流动性挖矿激励</p>
+              </div>
+            </div>
+          </ThemedCard>
+        </div>
+      </Section>
+
+      {/* Token Utility */}
+      <Section title="代币用途" subtitle="$POI 在生态系统中的作用">
+        <div className="grid gap-6 md:grid-cols-3">
+          {utilities.map((utility) => {
+            const Icon = utility.icon;
+            return (
+              <ThemedCard key={utility.title} hover className="p-6">
+                <Icon className={cn(
+                  'w-12 h-12 mb-4',
+                  theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
+                )} />
+                <h4 className={cn(
+                  'text-lg font-bold mb-2',
+                  theme === 'cyberpunk' ? 'font-orbitron' : 'font-fredoka'
+                )}>
+                  {utility.title}
+                </h4>
+                <p className="text-sm opacity-90 mb-4">{utility.desc}</p>
+
+                <div className="space-y-1">
+                  {utility.examples.map((example) => (
+                    <div key={example} className="flex items-start gap-2 text-xs">
+                      <Zap className={cn(
+                        'w-3 h-3 mt-0.5 flex-shrink-0',
+                        theme === 'cyberpunk' ? 'text-green-400' : 'text-green-600'
+                      )} />
+                      <span className="opacity-80">{example}</span>
+                    </div>
+                  ))}
+                </div>
+              </ThemedCard>
+            );
+          })}
+        </div>
+      </Section>
+
+      {/* Vesting Schedule */}
+      <Section title="解锁计划" subtitle="代币释放时间表">
+        <ThemedCard className="p-6">
+          <div className="grid gap-4 md:grid-cols-2">
+            {vestingSchedule.map((item) => (
+              <div
+                key={item.category}
+                className={cn(
+                  'p-4 rounded-lg',
+                  theme === 'cyberpunk'
+                    ? 'bg-slate-900/60 border border-cyan-400/20'
+                    : 'bg-slate-50 border border-slate-200'
+                )}
+              >
+                <div className="flex items-start gap-3">
+                  <Lock className={cn(
+                    'w-5 h-5 mt-0.5 flex-shrink-0',
+                    theme === 'cyberpunk' ? 'text-pink-400' : 'text-purple-600'
+                  )} />
+                  <div>
+                    <div className="font-semibold mb-1">{item.category}</div>
+                    <div className="text-xs opacity-80">{item.unlock}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <div className={cn(
+            'mt-6 p-4 rounded-lg text-sm',
+            theme === 'cyberpunk'
+              ? 'bg-cyan-400/10 border border-cyan-400/30'
+              : 'bg-blue-50 border border-blue-200'
+          )}>
+            <div className="flex items-start gap-2">
+              <Shield className={cn(
+                'w-5 h-5 mt-0.5 flex-shrink-0',
+                theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
+              )} />
+              <div>
+                <div className="font-semibold mb-1">解锁保障</div>
+                <p className="opacity-90 text-xs">
+                  所有解锁计划通过智能合约自动执行，透明可查。团队和投资者代币设有锁定期，确保长期发展激励一致。
+                </p>
+              </div>
+            </div>
+          </div>
+        </ThemedCard>
+      </Section>
+
+      {/* Roadmap */}
+      <Section title="发展路线" subtitle="2025-2026 规划">
+        <div className="grid gap-4 md:grid-cols-4">
+          {[
+            { quarter: "Q4 2025", milestone: "TGE 启动 & DEX 上市" },
+            { quarter: "Q1 2026", milestone: "CEX 上市 & 质押功能" },
+            { quarter: "Q2 2026", milestone: "跨链桥 & NFT 集成" },
+            { quarter: "Q3 2026", milestone: "DAO 治理 & 移动端" },
+          ].map((item, index) => (
+            <ThemedCard key={item.quarter} hover className="p-5 text-center">
+              <div className={cn(
+                'w-10 h-10 rounded-full flex items-center justify-center mx-auto mb-3 text-lg font-bold',
+                theme === 'cyberpunk'
+                  ? 'bg-cyan-400/20 text-cyan-300 border border-cyan-400/40'
+                  : 'bg-blue-100 text-blue-600 border border-blue-300'
+              )}>
+                {index + 1}
+              </div>
+              <div className="font-bold mb-1">{item.quarter}</div>
+              <div className="text-sm opacity-80">{item.milestone}</div>
+            </ThemedCard>
+          ))}
+        </div>
+      </Section>
+
+      {/* CTA */}
+      <Section>
+        <ThemedCard className="p-8 text-center">
+          <Rocket className={cn(
+            'w-12 h-12 mx-auto mb-4',
+            theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
+          )} />
+          <h3 className={cn(
+            'text-2xl font-bold mb-2',
+            theme === 'cyberpunk' ? 'font-orbitron' : 'font-fredoka'
+          )}>
+            参与 $POI TGE
+          </h3>
+          <p className="text-sm opacity-80 mb-6 max-w-2xl mx-auto">
+            成为 ProofOfInfluence 生态的早期参与者
+          </p>
+          <div className="flex justify-center gap-3">
+            <Link href="/tge">
+              <ThemedButton emphasis size="lg">
+                加入 TGE
+              </ThemedButton>
+            </Link>
+            <ThemedButton variant="outline" size="lg">
+              下载白皮书
+            </ThemedButton>
+          </div>
+        </ThemedCard>
+      </Section>
+    </PageLayout>
   );
 }
-

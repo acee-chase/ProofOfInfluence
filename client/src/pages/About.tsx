@@ -1,228 +1,195 @@
-import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import Header from "@/components/Header";
-import Footer from "@/components/Footer";
+import React from "react";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { Section } from "@/components/layout/Section";
+import { ThemedCard, ThemedButton } from "@/components/themed";
+import { useTheme } from "@/contexts/ThemeContext";
+import { cn } from "@/lib/utils";
 import {
-  Building2,
-  Shield,
-  FileText,
-  CheckCircle2,
-  Clock,
+  Target,
   Users,
+  TrendingUp,
+  Shield,
+  Globe,
   Mail,
-  MapPin,
+  Twitter,
+  MessageCircle,
 } from "lucide-react";
 
 export default function About() {
-  const [activeTab, setActiveTab] = useState("company");
+  const { theme } = useTheme();
+
+  const stats = [
+    { label: "Total TVL", value: "$42.3M", icon: TrendingUp },
+    { label: "Creators", value: "6,284", icon: Users },
+    { label: "Reward Paid", value: "$3.8M", icon: Shield },
+  ];
+
+  const team = [
+    { name: "Chase (CEO)", role: "前 Web3 创业者，区块链行业 5+ 年经验" },
+    { name: "Annie (CMO)", role: "营销专家，曾服务多个知名 Web3 项目" },
+    { name: "Simon (Advisor)", role: "技术顾问，DeFi 协议架构师" },
+  ];
+
+  const values = [
+    {
+      icon: Target,
+      title: "使命",
+      desc: "让每个人的影响力都能被公平衡量和变现",
+    },
+    {
+      icon: Users,
+      title: "愿景",
+      desc: "成为全球领先的去中心化影响力经济平台",
+    },
+    {
+      icon: Shield,
+      title: "价值观",
+      desc: "透明、公平、创新、用户至上",
+    },
+  ];
 
   return (
-    <div className="min-h-screen bg-[#0a0a0f] text-white">
-      <Header lang="zh" />
+    <PageLayout>
+      <Section>
+        <div className="text-center max-w-3xl mx-auto mb-12">
+          <h1 className={cn(
+            'text-3xl md:text-5xl font-extrabold mb-4',
+            theme === 'cyberpunk' ? 'font-orbitron' : 'font-fredoka'
+          )}>
+            About Us
+          </h1>
+          <p className={cn(
+            'text-lg opacity-80',
+            theme === 'cyberpunk' ? 'text-slate-300' : 'text-slate-600'
+          )}>
+            构建影响力经济的未来
+          </p>
+        </div>
 
-      {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-[length:40px_40px] opacity-10"
-          style={{
-            backgroundImage: 'linear-gradient(rgba(0, 240, 255, 0.1) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 240, 255, 0.1) 1px, transparent 1px)'
-          }}
-        />
+        {/* Stats */}
+        <div className="grid gap-4 md:grid-cols-3 mb-12">
+          {stats.map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <ThemedCard key={stat.label} className="p-6 text-center">
+                <Icon className={cn(
+                  'w-10 h-10 mx-auto mb-3',
+                  theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
+                )} />
+                <div className="text-xs opacity-70 mb-2">{stat.label}</div>
+                <div className={cn(
+                  'text-3xl font-bold',
+                  theme === 'cyberpunk' ? 'font-orbitron text-cyan-300' : 'font-poppins text-blue-600'
+                )}>
+                  {stat.value}
+                </div>
+              </ThemedCard>
+            );
+          })}
+        </div>
+      </Section>
 
-        <div className="relative max-w-7xl mx-auto px-4 py-20">
-          <div className="text-center space-y-6">
-            <Badge className="bg-neon-cyan/10 text-neon-cyan border-neon-cyan/30 font-rajdhani font-bold px-4 py-1">
-              ABOUT ACEE
-            </Badge>
-            
-            <h1 className="text-5xl md:text-6xl font-orbitron font-bold">
-              <span className="text-transparent bg-clip-text bg-gradient-to-r from-neon-cyan to-neon-purple">
-                关于我们
-              </span>
-            </h1>
+      {/* Mission & Vision */}
+      <Section title="我们的使命与愿景">
+        <div className="grid gap-6 md:grid-cols-3">
+          {values.map((value) => {
+            const Icon = value.icon;
+            return (
+              <ThemedCard key={value.title} hover className="p-6 text-center">
+                <Icon className={cn(
+                  'w-12 h-12 mx-auto mb-4',
+                  theme === 'cyberpunk' ? 'text-pink-400' : 'text-purple-600'
+                )} />
+                <h3 className={cn(
+                  'text-lg font-bold mb-2',
+                  theme === 'cyberpunk' ? 'font-orbitron' : 'font-fredoka'
+                )}>
+                  {value.title}
+                </h3>
+                <p className="text-sm opacity-90">{value.desc}</p>
+              </ThemedCard>
+            );
+          })}
+        </div>
+      </Section>
 
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-              ACEE Ventures - 引领 Web3 影响力变现革命
+      {/* Team */}
+      <Section title="核心团队" subtitle="经验丰富的 Web3 团队">
+        <div className="grid gap-6 md:grid-cols-3">
+          {team.map((member) => (
+            <ThemedCard key={member.name} hover className="p-6">
+              <div className={cn(
+                'w-24 h-24 rounded-full mx-auto mb-4',
+                theme === 'cyberpunk'
+                  ? 'bg-gradient-to-br from-cyan-400/30 to-pink-500/30 border border-cyan-400/40'
+                  : 'bg-gradient-to-br from-blue-200 to-purple-200 border border-blue-300'
+              )} />
+              <h4 className="text-lg font-bold text-center mb-2">{member.name}</h4>
+              <p className="text-sm opacity-80 text-center">{member.role}</p>
+            </ThemedCard>
+          ))}
+        </div>
+      </Section>
+
+      {/* Contact */}
+      <Section title="联系我们">
+        <ThemedCard className="p-8 max-w-2xl mx-auto">
+          <div className="grid gap-4 md:grid-cols-3 mb-6">
+            <a
+              href="mailto:contact@proofofinfluence.com"
+              className={cn(
+                'flex items-center gap-2 p-3 rounded-lg transition-colors',
+                theme === 'cyberpunk'
+                  ? 'hover:bg-cyan-400/10'
+                  : 'hover:bg-blue-50'
+              )}
+            >
+              <Mail className="w-5 h-5" />
+              <span className="text-sm">Email</span>
+            </a>
+
+            <a
+              href="https://twitter.com/proofofinfluence"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                'flex items-center gap-2 p-3 rounded-lg transition-colors',
+                theme === 'cyberpunk'
+                  ? 'hover:bg-cyan-400/10'
+                  : 'hover:bg-blue-50'
+              )}
+            >
+              <Twitter className="w-5 h-5" />
+              <span className="text-sm">Twitter</span>
+            </a>
+
+            <a
+              href="https://discord.gg/proofofinfluence"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                'flex items-center gap-2 p-3 rounded-lg transition-colors',
+                theme === 'cyberpunk'
+                  ? 'hover:bg-cyan-400/10'
+                  : 'hover:bg-blue-50'
+              )}
+            >
+              <MessageCircle className="w-5 h-5" />
+              <span className="text-sm">Discord</span>
+            </a>
+          </div>
+
+          <div className="text-center">
+            <Globe className={cn(
+              'w-8 h-8 mx-auto mb-2 opacity-50',
+              theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
+            )} />
+            <p className="text-sm opacity-70">
+              Based in Singapore | Serving the World
             </p>
           </div>
-        </div>
-      </section>
-
-      {/* Tabs */}
-      <section className="max-w-7xl mx-auto px-4 py-16">
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="w-full bg-black/40 border border-neon-cyan/20 p-1 rounded-sm backdrop-blur-md mb-12">
-            <TabsTrigger 
-              value="company"
-              className="flex-1 data-[state=active]:bg-neon-cyan/20 data-[state=active]:text-neon-cyan data-[state=active]:border data-[state=active]:border-neon-cyan/50 rounded-sm font-rajdhani font-bold"
-            >
-              <Building2 className="w-4 h-4 mr-2" />
-              公司介绍
-            </TabsTrigger>
-            <TabsTrigger 
-              value="compliance"
-              className="flex-1 data-[state=active]:bg-neon-purple/20 data-[state=active]:text-neon-purple data-[state=active]:border data-[state=active]:border-neon-purple/50 rounded-sm font-rajdhani font-bold"
-            >
-              <Shield className="w-4 h-4 mr-2" />
-              合规政策
-            </TabsTrigger>
-            <TabsTrigger 
-              value="changelog"
-              className="flex-1 data-[state=active]:bg-neon-pink/20 data-[state=active]:text-neon-pink data-[state=active]:border data-[state=active]:border-neon-pink/50 rounded-sm font-rajdhani font-bold"
-            >
-              <FileText className="w-4 h-4 mr-2" />
-              更新日志
-            </TabsTrigger>
-          </TabsList>
-
-          {/* Company Tab */}
-          <TabsContent value="company">
-            <div className="space-y-8">
-              <Card className="p-8 bg-[#1a1a24]/60 border-neon-cyan/20 rounded-sm backdrop-blur-sm">
-                <h2 className="text-3xl font-orbitron font-bold text-white mb-6">
-                  ACEE Ventures
-                </h2>
-                <p className="text-gray-300 leading-relaxed mb-6">
-                  ACEE Ventures 是一家专注于 Web3 技术创新的科技公司，致力于通过区块链技术
-                  重塑社交影响力的价值流通方式。我们的使命是让每个人的影响力都能被公正地量化和变现。
-                </p>
-
-                <div className="grid md:grid-cols-2 gap-6 mt-8">
-                  <div className="p-6 bg-black/30 border border-neon-cyan/20 rounded-sm">
-                    <Users className="w-8 h-8 text-neon-cyan mb-3" />
-                    <h3 className="font-rajdhani font-bold text-white mb-2">团队</h3>
-                    <p className="text-gray-400 text-sm">
-                      由资深区块链开发者和金融专家组成
-                    </p>
-                  </div>
-                  <div className="p-6 bg-black/30 border border-neon-cyan/20 rounded-sm">
-                    <MapPin className="w-8 h-8 text-neon-cyan mb-3" />
-                    <h3 className="font-rajdhani font-bold text-white mb-2">总部</h3>
-                    <p className="text-gray-400 text-sm">
-                      全球分布式团队
-                    </p>
-                  </div>
-                </div>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Compliance Tab */}
-          <TabsContent value="compliance">
-            <Card className="p-8 bg-[#1a1a24]/60 border-neon-purple/20 rounded-sm backdrop-blur-sm">
-              <h2 className="text-3xl font-orbitron font-bold text-white mb-6">
-                合规与安全
-              </h2>
-              
-              <div className="space-y-6 text-gray-300">
-                <div className="p-6 bg-black/30 border border-neon-purple/20 rounded-sm">
-                  <h3 className="text-xl font-rajdhani font-bold text-white mb-4">
-                    KYC/AML 政策
-                  </h3>
-                  <p className="leading-relaxed">
-                    我们严格遵守全球反洗钱（AML）和了解你的客户（KYC）法规。
-                    所有用户需通过身份验证才能访问核心交易功能。
-                  </p>
-                </div>
-
-                <div className="p-6 bg-black/30 border border-neon-purple/20 rounded-sm">
-                  <h3 className="text-xl font-rajdhani font-bold text-white mb-4">
-                    数据隐私
-                  </h3>
-                  <p className="leading-relaxed">
-                    我们承诺保护用户隐私，遵守 GDPR 和其他数据保护法规。
-                    用户数据使用加密存储，不会未经授权分享给第三方。
-                  </p>
-                </div>
-
-                <div className="p-6 bg-black/30 border border-neon-purple/20 rounded-sm">
-                  <h3 className="text-xl font-rajdhani font-bold text-white mb-4">
-                    风险声明
-                  </h3>
-                  <p className="leading-relaxed">
-                    加密货币投资存在风险，代币价格可能大幅波动。
-                    请只投资您能承受损失的金额，并进行充分的研究和风险评估。
-                  </p>
-                </div>
-              </div>
-            </Card>
-          </TabsContent>
-
-          {/* Changelog Tab */}
-          <TabsContent value="changelog">
-            <Card className="p-8 bg-[#1a1a24]/60 border-neon-pink/20 rounded-sm backdrop-blur-sm">
-              <h2 className="text-3xl font-orbitron font-bold text-white mb-6">
-                更新日志
-              </h2>
-              
-              <div className="space-y-6">
-                {[
-                  {
-                    version: "v2.1.0",
-                    date: "2025-11-13",
-                    changes: [
-                      "新增 TGE 冷启动活动页面",
-                      "实现早鸟空投和推荐计划",
-                      "优化 Landing Page 和 Dashboard",
-                      "添加空投领取功能",
-                    ],
-                  },
-                  {
-                    version: "v2.0.0",
-                    date: "2025-11-01",
-                    changes: [
-                      "重构信息架构",
-                      "新增 Market 交易模块",
-                      "实现 Reserve Pool 资金池",
-                      "添加商家后台功能",
-                    ],
-                  },
-                  {
-                    version: "v1.5.0",
-                    date: "2025-10-15",
-                    changes: [
-                      "集成 Stripe 支付",
-                      "优化钱包连接体验",
-                      "新增访问控制系统",
-                      "改进移动端适配",
-                    ],
-                  },
-                ].map((release, idx) => (
-                  <div
-                    key={idx}
-                    className="border-l-2 border-neon-pink/50 pl-6 relative"
-                  >
-                    {/* Timeline dot */}
-                    <div className="absolute -left-[5px] top-0 w-2 h-2 bg-neon-pink rounded-full shadow-[0_0_10px_rgba(255,0,110,0.8)]" />
-                    
-                    <div className="flex items-center gap-3 mb-3">
-                      <Badge className="bg-neon-pink/20 text-neon-pink border-neon-pink/30 font-rajdhani font-bold">
-                        {release.version}
-                      </Badge>
-                      <span className="text-gray-500 text-sm font-mono">
-                        {release.date}
-                      </span>
-                    </div>
-                    
-                    <ul className="space-y-2">
-                      {release.changes.map((change, changeIdx) => (
-                        <li key={changeIdx} className="flex items-start gap-2 text-gray-400">
-                          <CheckCircle2 className="w-4 h-4 text-neon-cyan mt-1 flex-shrink-0" />
-                          <span>{change}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          </TabsContent>
-        </Tabs>
-      </section>
-
-      <Footer lang="zh" />
-    </div>
+        </ThemedCard>
+      </Section>
+    </PageLayout>
   );
 }
-

@@ -1,161 +1,322 @@
-import { useEffect, useState } from "react";
-import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
-import { ShieldCheck, Info, Coins, CreditCard, ArrowLeft } from "lucide-react";
-import ThemeToggle from "@/components/ThemeToggle";
-import StripePayment from "@/components/StripePayment";
-import type { PoiTier } from "@shared/schema";
+import React, { useState } from "react";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { Section } from "@/components/layout/Section";
+import { ThemedCard, ThemedButton, ThemedInput } from "@/components/themed";
+import { useTheme } from "@/contexts/ThemeContext";
+import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import {
+  Wallet,
+  CreditCard,
+  Building2,
+  ArrowRight,
+  CheckCircle2,
+  Info,
+  Shield,
+} from "lucide-react";
+
+type PaymentMethod = "onchain" | "card" | "thirdparty";
 
 export default function Recharge() {
-  const [, setLocation] = useLocation();
-  const [tiers, setTiers] = useState<PoiTier[]>([]);
-  const [region, setRegion] = useState("US");
-  const [feeCreditEnabled, setFeeCreditEnabled] = useState(false);
+  const { theme } = useTheme();
+  const { toast } = useToast();
 
-  useEffect(() => {
-    // Fetch configuration data
-    Promise.all([
-      fetch("/api/poi/tiers").then(r => r.json()),
-      fetch("/api/region").then(r => r.json()),
-      fetch("/api/features").then(r => r.json())
-    ]).then(([tierRes, regionRes, featureRes]) => {
-      setTiers(tierRes);
-      setRegion(regionRes.region);
-      setFeeCreditEnabled(!!featureRes.FEATURE_POI_FEE_CREDIT);
-    }).catch(error => {
-      console.error("Error fetching configuration:", error);
-    });
-  }, []);
+  const [selectedMethod, setSelectedMethod] = useState<PaymentMethod>("onchain");
+  const [amount, setAmount] = useState("");
+  const [loading, setLoading] = useState(false);
 
-  const handleBack = () => {
-    window.history.back();
+  const paymentMethods = [
+    {
+      id: "onchain" as const,
+      icon: Wallet,
+      title: "链上支付",
+      desc: "使用加密钱包直接支付",
+      fee: "0.5%",
+    },
+    {
+      id: "card" as const,
+      icon: CreditCard,
+      title: "信用卡",
+      desc: "Visa / Mastercard / Amex",
+      fee: "2.9%",
+    },
+    {
+      id: "thirdparty" as const,
+      icon: Building2,
+      title: "第三方支付",
+      desc: "支付宝 / 微信支付",
+      fee: "1.5%",
+    },
+  ];
+
+  const calculateFee = (amt: string) => {
+    const numAmount = parseFloat(amt) || 0;
+    const feeRate = selectedMethod === "onchain" ? 0.005 
+      : selectedMethod === "card" ? 0.029 
+      : 0.015;
+    return (numAmount * feeRate).toFixed(2);
+  };
+
+  const calculateReceived = (amt: string) => {
+    const numAmount = parseFloat(amt) || 0;
+    const fee = parseFloat(calculateFee(amt));
+    // Mock POI price: $1 = 0.958 POI (considering fee)
+    return ((numAmount - fee) * 0.958).toFixed(2);
+  };
+
+  const handleSubmit = async () => {
+    if (!amount || parseFloat(amount) <= 0) {
+      toast({
+        title: "错误",
+        description: "请输入有效金额",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setLoading(true);
+
+    // Simulate payment processing
+    setTimeout(() => {
+      toast({
+        title: "处理中",
+        description: "正在处理您的充值请求...",
+      });
+      
+      setTimeout(() => {
+        setLoading(false);
+        toast({
+          title: "充值成功！",
+          description: `已充值 ${calculateReceived(amount)} POI 到您的账户`,
+        });
+        setAmount("");
+      }, 2000);
+    }, 1000);
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5">
-      <div className="absolute top-4 left-4">
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleBack}
-          data-testid="button-back"
-        >
-          <ArrowLeft className="h-5 w-5" />
-        </Button>
-      </div>
-      
-      <div className="absolute top-4 right-4">
-        <ThemeToggle />
-      </div>
+    <PageLayout>
+      {/* Header */}
+      <Section>
+        <div className="max-w-4xl mx-auto">
+          <h1 className={cn(
+            'text-2xl font-bold text-center mb-2',
+            theme === 'cyberpunk' ? 'font-orbitron text-cyan-100' : 'font-fredoka text-slate-900'
+          )}>
+            Recharge
+          </h1>
+          <p className="text-center text-sm opacity-70 mb-8">
+            添加资金到您的 ProofOfInfluence 账户
+          </p>
 
-      <div className="max-w-5xl mx-auto px-4 py-12 md:py-20">
-        <div className="flex flex-col items-center space-y-8">
-          {/* Header */}
-          <div className="space-y-4 text-center">
-            <h1 className="text-4xl md:text-6xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
-              充值 $POI Token
-            </h1>
-            <p className="text-lg md:text-xl text-muted-foreground max-w-2xl mx-auto leading-relaxed">
-              $POI 是平台功能型代币，用于会员等级与平台费用优惠。购买 RWA 名表请使用 Visa / Crypto；$POI 不直接作为商品价款的支付工具。
-            </p>
+          {/* Step Indicator */}
+          <div className="flex items-center justify-center gap-2 mb-8">
+            {["选择方式", "输入金额", "确认"].map((step, index) => (
+              <React.Fragment key={step}>
+                <div className="flex items-center gap-2">
+                  <div className={cn(
+                    'w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold',
+                    theme === 'cyberpunk'
+                      ? 'bg-cyan-400/20 text-cyan-300 border border-cyan-400/40'
+                      : 'bg-blue-100 text-blue-600 border border-blue-300'
+                  )}>
+                    {index + 1}
+                  </div>
+                  <span className="text-sm hidden md:inline">{step}</span>
+                </div>
+                {index < 2 && (
+                  <div className={cn(
+                    'w-8 h-0.5',
+                    theme === 'cyberpunk' ? 'bg-cyan-400/30' : 'bg-slate-200'
+                  )} />
+                )}
+              </React.Fragment>
+            ))}
           </div>
 
-          {/* Compliance Notice */}
-          <Alert className="bg-muted/40 max-w-3xl">
-            <ShieldCheck className="h-5 w-5" />
-            <AlertTitle>合规与使用范围</AlertTitle>
-            <AlertDescription>
-              <ul className="list-disc pl-4 space-y-1 mt-2">
-                <li>$POI 为功能型代币，符合平台合规要求</li>
-                <li><strong>会员等级折扣（全局）</strong>：持有/质押 $POI 可获得平台费用/物流补贴优惠</li>
-                {feeCreditEnabled ? (
-                  <li><strong>费用抵扣积分（本地区开放）</strong>：燃烧 $POI 兑换 Fee Credits，仅抵平台相关费用（不抵商品价款），抵扣上限 15-20%</li>
-                ) : (
-                  <li>费用抵扣积分在您所在地区暂未开放</li>
-                )}
-              </ul>
-            </AlertDescription>
-          </Alert>
+          {/* Payment Methods */}
+          <div className="grid gap-4 md:grid-cols-3 mb-6">
+            {paymentMethods.map((method) => {
+              const Icon = method.icon;
+              const isSelected = selectedMethod === method.id;
 
-          {/* Stripe Payment Component */}
-          <StripePayment />
+              return (
+                <ThemedCard
+                  key={method.id}
+                  hover
+                  className={cn(
+                    'p-5 cursor-pointer transition-all',
+                    isSelected &&
+                    (theme === 'cyberpunk'
+                      ? 'border-2 border-cyan-400/50 bg-cyan-400/10'
+                      : 'border-2 border-blue-500 bg-blue-50')
+                  )}
+                  onClick={() => setSelectedMethod(method.id)}
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <Icon className={cn(
+                      'w-8 h-8',
+                      isSelected
+                        ? theme === 'cyberpunk'
+                          ? 'text-cyan-300'
+                          : 'text-blue-600'
+                        : 'opacity-50'
+                    )} />
+                    {isSelected && (
+                      <CheckCircle2 className={cn(
+                        'w-5 h-5',
+                        theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
+                      )} />
+                    )}
+                  </div>
 
-          {/* Alternative Payment Methods */}
-          <Card className="p-6 space-y-4 max-w-3xl w-full">
-            <h2 className="text-2xl font-semibold text-center">其他支付方式</h2>
-            <div className="flex flex-wrap gap-3 justify-center">
-              <Button variant="outline"><CreditCard className="mr-2 h-4 w-4" /> 使用 Visa 购买</Button>
-              <Button variant="outline"><Coins className="mr-2 h-4 w-4" /> 使用 Crypto 购买</Button>
-            </div>
-            <p className="text-xs text-center text-muted-foreground">
-              购买即表示您理解 $POI 为平台功能型代币；价格或有波动；不同地区功能可能有所差异。
-            </p>
-          </Card>
+                  <h4 className="font-bold mb-1">{method.title}</h4>
+                  <p className="text-xs opacity-70 mb-2">{method.desc}</p>
+                  <div className="text-xs">
+                    <span className="opacity-70">手续费: </span>
+                    <span className={cn(
+                      'font-semibold',
+                      theme === 'cyberpunk' ? 'text-pink-300' : 'text-green-600'
+                    )}>
+                      {method.fee}
+                    </span>
+                  </div>
+                </ThemedCard>
+              );
+            })}
+          </div>
 
-          {/* Tier Benefits */}
-          <Card className="p-6 space-y-4 max-w-3xl w-full">
-            <h3 className="text-xl font-semibold text-center">会员等级权益</h3>
-            {tiers.length > 0 ? (
-              <ul className="list-disc pl-6 text-sm text-muted-foreground space-y-2">
-                {tiers.map((tier) => {
-                  const discountPercent = (parseFloat(tier.feeDiscountRate) * 100).toFixed(0);
-                  const shippingCap = (tier.shippingCreditCapCents / 100).toFixed(0);
-                  return (
-                    <li key={tier.id}>
-                      {tier.name}（≥{tier.minPoi.toLocaleString()} POI）：
-                      平台费 -{discountPercent}%，物流补贴封顶 ${shippingCap}
-                    </li>
-                  );
-                })}
-              </ul>
-            ) : (
-              <ul className="list-disc pl-6 text-sm text-muted-foreground space-y-2">
-                <li>Lv1（≥5,000 POI）：平台费 -5%，物流补贴封顶 $50</li>
-                <li>Lv2（≥25,000 POI）：平台费 -10%，物流补贴封顶 $150</li>
-                <li>Lv3（≥100,000 POI）：平台费 -15%，物流补贴封顶 $300</li>
-              </ul>
-            )}
-          </Card>
+          {/* Amount Input */}
+          <ThemedCard className="p-6 mb-6">
+            <h3 className={cn(
+              'text-lg font-bold mb-4',
+              theme === 'cyberpunk' ? 'font-rajdhani text-cyan-200' : 'font-poppins text-slate-900'
+            )}>
+              输入金额
+            </h3>
 
-          {/* Fee Credits Feature */}
-          {feeCreditEnabled && (
-            <Card className="p-6 space-y-4 max-w-3xl w-full">
-              <h3 className="text-xl font-semibold">费用抵扣积分（Fee Credits）</h3>
-              <p className="text-sm text-muted-foreground">
-                通过燃烧 $POI 可兑换 Fee Credits，仅用于抵扣平台服务费/保真/托管/物流补贴，单笔抵扣不超过相应费用的 20%。
-                （可用性与上限以结算页展示为准）
-              </p>
-              <div className="flex gap-2 flex-wrap">
-                <Button disabled>烧毁 $POI 兑换积分</Button>
-                <Button variant="outline" onClick={() => setLocation("/dashboard")}>查看我的积分余额</Button>
+            <ThemedInput
+              type="number"
+              placeholder="100.00"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              label="USD"
+              helperText="最小充值金额: $10"
+            />
+
+            {/* Calculation Summary */}
+            {amount && parseFloat(amount) > 0 && (
+              <div className={cn(
+                'mt-4 p-4 rounded-lg space-y-2',
+                theme === 'cyberpunk'
+                  ? 'bg-slate-900/60 border border-cyan-400/20'
+                  : 'bg-slate-50 border border-slate-200'
+              )}>
+                <div className="flex justify-between text-sm">
+                  <span className="opacity-70">充值金额</span>
+                  <span className="font-medium">${amount}</span>
+                </div>
+                <div className="flex justify-between text-sm">
+                  <span className="opacity-70">手续费</span>
+                  <span className={cn(
+                    'font-medium',
+                    theme === 'cyberpunk' ? 'text-pink-300' : 'text-orange-600'
+                  )}>
+                    -${calculateFee(amount)}
+                  </span>
+                </div>
+                <div className={cn(
+                  'pt-2 border-t flex justify-between',
+                  theme === 'cyberpunk' ? 'border-cyan-400/20' : 'border-slate-200'
+                )}>
+                  <span className="font-semibold">预计到账</span>
+                  <span className={cn(
+                    'text-lg font-bold',
+                    theme === 'cyberpunk' ? 'text-green-400' : 'text-green-600'
+                  )}>
+                    {calculateReceived(amount)} POI
+                  </span>
+                </div>
               </div>
-            </Card>
-          )}
+            )}
+          </ThemedCard>
 
-          {/* RWA Information */}
-          <Alert variant="default" className="max-w-3xl">
-            <Info className="h-5 w-5" />
-            <AlertTitle>名贵手表 RWA 说明</AlertTitle>
-            <AlertDescription className="space-y-2 text-sm">
-              <p>
-                <strong>可溯源：</strong>出厂/购入/鉴定/维保/过户链上备案（哈希+时间戳）。
-              </p>
-              <p>
-                <strong>匿名传递：</strong>仅限"库内过户或仅转凭证"。一旦发货，需完成 KYC 且物流信息会暴露身份。
-              </p>
-            </AlertDescription>
-          </Alert>
+          {/* Security Note */}
+          <ThemedCard className={cn(
+            'p-4 mb-6',
+            theme === 'cyberpunk'
+              ? 'bg-cyan-400/10 border border-cyan-400/30'
+              : 'bg-blue-50 border border-blue-200'
+          )}>
+            <div className="flex items-start gap-3">
+              <Shield className={cn(
+                'w-5 h-5 mt-0.5 flex-shrink-0',
+                theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
+              )} />
+              <div className="text-sm">
+                <div className="font-semibold mb-1">安全保障</div>
+                <p className="opacity-80 text-xs">
+                  我们使用行业领先的加密技术保护您的交易。所有支付信息均经过 SSL 加密传输。
+                </p>
+              </div>
+            </div>
+          </ThemedCard>
 
-          {/* Terms and Conditions */}
-          <p className="text-xs text-center text-muted-foreground max-w-2xl">
-            $POI 代币的购买与使用需遵守平台服务条款和适用法律法规。代币价格可能波动，不构成投资建议。
-            不同地区的功能和优惠可能存在差异，具体以当地规则为准。
-          </p>
+          {/* Submit Button */}
+          <ThemedButton
+            emphasis
+            size="lg"
+            className="w-full"
+            onClick={handleSubmit}
+            disabled={loading || !amount || parseFloat(amount) <= 0}
+          >
+            {loading ? "处理中..." : "确认充值"}
+            {!loading && <ArrowRight className="w-5 h-5 ml-2" />}
+          </ThemedButton>
+
+          {/* Additional Info */}
+          <div className={cn(
+            'mt-6 text-center text-xs opacity-70',
+            theme === 'cyberpunk' ? 'font-rajdhani' : 'font-poppins'
+          )}>
+            <Info className="w-4 h-4 inline-block mr-1" />
+            充值通常在 5-10 分钟内到账。如有问题请联系客服。
+          </div>
         </div>
-      </div>
-    </div>
+      </Section>
+
+      {/* FAQ */}
+      <Section title="常见问题" subtitle="关于充值的常见问题">
+        <div className="grid gap-4 md:grid-cols-2 max-w-4xl mx-auto">
+          <ThemedCard className="p-5">
+            <h4 className="font-bold mb-2">最小充值金额是多少？</h4>
+            <p className="text-sm opacity-80">
+              最小充值金额为 $10。建议首次充值不少于 $50 以获得更好的体验。
+            </p>
+          </ThemedCard>
+
+          <ThemedCard className="p-5">
+            <h4 className="font-bold mb-2">充值需要多长时间？</h4>
+            <p className="text-sm opacity-80">
+              链上支付通常在 5-10 分钟内到账。信用卡和第三方支付通常即时到账。
+            </p>
+          </ThemedCard>
+
+          <ThemedCard className="p-5">
+            <h4 className="font-bold mb-2">支持哪些支付方式？</h4>
+            <p className="text-sm opacity-80">
+              我们支持加密钱包、信用卡（Visa/Mastercard/Amex）以及支付宝/微信支付。
+            </p>
+          </ThemedCard>
+
+          <ThemedCard className="p-5">
+            <h4 className="font-bold mb-2">手续费如何计算？</h4>
+            <p className="text-sm opacity-80">
+              链上支付 0.5%，信用卡 2.9%，第三方支付 1.5%。所有费用在充值前明确显示。
+            </p>
+          </ThemedCard>
+        </div>
+      </Section>
+    </PageLayout>
   );
 }
-

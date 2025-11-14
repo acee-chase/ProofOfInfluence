@@ -1,143 +1,152 @@
-import { useEffect, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { CheckCircle2, Home, ArrowRight, Coins, AlertCircle } from "lucide-react";
+import React from "react";
 import { Link } from "wouter";
-import type { Transaction } from "@shared/schema";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { Section } from "@/components/layout/Section";
+import { ThemedCard, ThemedButton } from "@/components/themed";
+import { useTheme } from "@/contexts/ThemeContext";
+import { cn } from "@/lib/utils";
+import {
+  CheckCircle2,
+  ArrowRight,
+  Download,
+  Share2,
+  Home,
+} from "lucide-react";
 
 export default function PaymentSuccess() {
-  const [sessionId, setSessionId] = useState<string>("");
+  const { theme } = useTheme();
 
-  useEffect(() => {
-    // Get session_id from URL query params
-    const params = new URLSearchParams(window.location.search);
-    const id = params.get("session_id");
-    if (id) {
-      setSessionId(id);
-    }
-  }, []);
-
-  // Fetch transaction details
-  const { data: transaction, isLoading } = useQuery<Transaction>({
-    queryKey: ["/api/transaction", sessionId],
-    enabled: !!sessionId,
-    retry: 3,
-    retryDelay: 2000, // Wait for webhook to process
-  });
+  // Example transaction data (would come from URL params or state)
+  const transaction = {
+    amount: "$100.00",
+    poiReceived: "95.8 POI",
+    transactionId: "0x1234...5678",
+    timestamp: new Date().toLocaleString(),
+  };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-primary/5 via-background to-accent/5 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full p-8 space-y-6 text-center">
-        <div className="flex justify-center">
-          <div className="w-16 h-16 rounded-full bg-green-100 dark:bg-green-900/20 flex items-center justify-center">
-            <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
-          </div>
-        </div>
-
-        <div className="space-y-2">
-          <h1 className="text-3xl font-bold">Payment Successful!</h1>
-          <p className="text-muted-foreground">
-            Thank you for your payment. Your transaction has been completed successfully.
-          </p>
-        </div>
-
-        {isLoading ? (
-          <div className="space-y-3">
-            <Skeleton className="h-20 w-full" />
-            <Skeleton className="h-4 w-3/4 mx-auto" />
-          </div>
-        ) : transaction ? (
-          <>
-            {/* POI Tokens Purchased */}
-            <div className="bg-gradient-to-br from-primary/10 to-accent/10 rounded-lg p-6 space-y-2">
-              <div className="flex items-center justify-center gap-2 text-primary">
-                <Coins className="h-6 w-6" />
-                <span className="text-sm font-medium">$POI Tokens</span>
-              </div>
-              <p className="text-4xl font-bold">{transaction.poiTokens}</p>
-              <p className="text-xs text-muted-foreground">
-                Successfully added to your account
-              </p>
+    <PageLayout>
+      <Section>
+        <div className="max-w-2xl mx-auto">
+          {/* Success Icon */}
+          <div className="text-center mb-8">
+            <div className={cn(
+              'mx-auto w-20 h-20 rounded-full flex items-center justify-center mb-4',
+              theme === 'cyberpunk'
+                ? 'bg-green-400/20 ring-4 ring-green-400/20'
+                : 'bg-green-100 ring-4 ring-green-200'
+            )}>
+              <CheckCircle2 className={cn(
+                'w-12 h-12',
+                theme === 'cyberpunk' ? 'text-green-400' : 'text-green-600'
+              )} />
             </div>
 
-            {/* Transaction Details */}
-            <div className="bg-muted/50 rounded-lg p-4 space-y-3 text-left">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Amount Paid</span>
-                <span className="font-semibold">
-                  ${(transaction.amount / 100).toFixed(2)} {transaction.currency.toUpperCase()}
-                </span>
+            <h1 className={cn(
+              'text-3xl font-bold mb-2',
+              theme === 'cyberpunk' ? 'font-orbitron text-cyan-100' : 'font-fredoka text-slate-900'
+            )}>
+              Payment Successful!
+            </h1>
+            <p className="text-sm opacity-70">
+              您的充值已成功处理
+            </p>
+          </div>
+
+          {/* Transaction Details */}
+          <ThemedCard className="p-6 mb-6">
+            <h3 className={cn(
+              'text-lg font-bold mb-4',
+              theme === 'cyberpunk' ? 'font-rajdhani text-cyan-200' : 'font-poppins text-slate-900'
+            )}>
+              交易详情
+            </h3>
+
+            <div className="space-y-3">
+              <div className="flex justify-between py-2">
+                <span className="text-sm opacity-70">充值金额</span>
+                <span className="font-semibold">{transaction.amount}</span>
               </div>
-              
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-muted-foreground">Status</span>
-                <span className={`text-sm font-medium ${
-                  transaction.status === 'completed' 
-                    ? 'text-green-600 dark:text-green-400' 
-                    : 'text-yellow-600 dark:text-yellow-400'
-                }`}>
-                  {transaction.status === 'completed' ? '✓ Completed' : 'Processing...'}
+
+              <div className="flex justify-between py-2">
+                <span className="text-sm opacity-70">到账金额</span>
+                <span className={cn(
+                  'text-lg font-bold',
+                  theme === 'cyberpunk' ? 'text-green-400' : 'text-green-600'
+                )}>
+                  {transaction.poiReceived}
                 </span>
               </div>
 
-              {transaction.status !== 'completed' && (
-                <div className="flex items-start gap-2 text-xs text-yellow-600 dark:text-yellow-400 bg-yellow-50 dark:bg-yellow-900/20 p-2 rounded">
-                  <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <span>
-                    Payment is being processed. Your tokens will be credited shortly.
-                  </span>
+              <div className={cn(
+                'border-t pt-3',
+                theme === 'cyberpunk' ? 'border-cyan-400/20' : 'border-slate-200'
+              )}>
+                <div className="flex justify-between text-xs mb-2">
+                  <span className="opacity-70">交易 ID</span>
+                  <span className="font-mono">{transaction.transactionId}</span>
                 </div>
-              )}
-              
-              <div className="pt-2 border-t">
-                <p className="text-xs text-muted-foreground mb-1">Transaction ID</p>
-                <p className="text-xs font-mono break-all">{transaction.id}</p>
+                <div className="flex justify-between text-xs">
+                  <span className="opacity-70">时间</span>
+                  <span>{transaction.timestamp}</span>
+                </div>
               </div>
             </div>
-          </>
-        ) : sessionId ? (
-          <div className="bg-muted/50 rounded-lg p-4">
-            <p className="text-xs text-muted-foreground mb-1">Session ID</p>
-            <p className="text-sm font-mono break-all">{sessionId}</p>
-          </div>
-        ) : null}
 
-        <div className="space-y-3 pt-4">
-          <p className="text-sm text-muted-foreground">
-            You will receive a confirmation email shortly with your payment details.
-          </p>
+            <div className="mt-4 flex gap-2">
+              <ThemedButton variant="outline" size="sm" className="flex-1">
+                <Download className="w-4 h-4 mr-2" />
+                下载收据
+              </ThemedButton>
+              <ThemedButton variant="outline" size="sm" className="flex-1">
+                <Share2 className="w-4 h-4 mr-2" />
+                分享
+              </ThemedButton>
+            </div>
+          </ThemedCard>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button asChild className="flex-1">
-              <Link href="/">
-                <Home className="mr-2 h-4 w-4" />
-                Back to Home
+          {/* Next Steps */}
+          <ThemedCard className="p-6 mb-6">
+            <h3 className={cn(
+              'text-lg font-bold mb-4',
+              theme === 'cyberpunk' ? 'font-rajdhani text-cyan-200' : 'font-poppins text-slate-900'
+            )}>
+              下一步
+            </h3>
+
+            <div className="space-y-3">
+              <Link href="/app/market">
+                <ThemedButton emphasis className="w-full justify-between">
+                  <span>前往交易市场</span>
+                  <ArrowRight className="w-4 h-4" />
+                </ThemedButton>
               </Link>
-            </Button>
-            <Button asChild variant="outline" className="flex-1">
+
               <Link href="/app">
-                <ArrowRight className="mr-2 h-4 w-4" />
-                Go to projectX
+                <ThemedButton variant="outline" className="w-full justify-between">
+                  <span>查看我的 Dashboard</span>
+                  <ArrowRight className="w-4 h-4" />
+                </ThemedButton>
               </Link>
-            </Button>
+
+              <Link href="/">
+                <ThemedButton variant="ghost" className="w-full justify-center">
+                  <Home className="w-4 h-4 mr-2" />
+                  返回首页
+                </ThemedButton>
+              </Link>
+            </div>
+          </ThemedCard>
+
+          {/* Confirmation Note */}
+          <div className={cn(
+            'text-center text-xs opacity-70',
+            theme === 'cyberpunk' ? 'font-rajdhani' : 'font-poppins'
+          )}>
+            确认邮件已发送到您的邮箱。代币将在 5-10 分钟内到账。
           </div>
         </div>
-
-        <div className="pt-4 border-t">
-          <p className="text-xs text-muted-foreground">
-            Need help? Contact support at{" "}
-            <a
-              href="mailto:support@proofofinfluence.com"
-              className="text-primary hover:underline"
-            >
-              support@proofofinfluence.com
-            </a>
-          </p>
-        </div>
-      </Card>
-    </div>
+      </Section>
+    </PageLayout>
   );
 }
-

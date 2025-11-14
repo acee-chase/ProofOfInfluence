@@ -1,154 +1,198 @@
-import { useEffect } from "react";
+import React, { useState } from "react";
 import { useLocation } from "wouter";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
-import { useAuth } from "@/hooks/useAuth";
-import { Chrome, Apple, MessageCircle } from "lucide-react";
-import { SiXiaohongshu } from "react-icons/si";
+import { PageLayout } from "@/components/layout/PageLayout";
+import { Section } from "@/components/layout/Section";
+import { ThemedCard, ThemedButton, ThemedInput } from "@/components/themed";
+import { useTheme } from "@/contexts/ThemeContext";
+import { cn } from "@/lib/utils";
+import WalletConnectButton from "@/components/WalletConnectButton";
+import {
+  Mail,
+  Lock,
+  Wallet,
+  Chrome,
+  Apple,
+  ArrowRight,
+} from "lucide-react";
 
 export default function Login() {
+  const { theme } = useTheme();
   const [, setLocation] = useLocation();
-  const { isAuthenticated } = useAuth();
 
-  // Redirect to app if already authenticated
-  useEffect(() => {
-    if (isAuthenticated) {
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleEmailLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+
+    // Simulate login
+    setTimeout(() => {
+      setLoading(false);
       setLocation("/app");
-    }
-  }, [isAuthenticated, setLocation]);
-
-  const handleReplitLogin = () => {
-    window.location.href = "/api/login";
+    }, 1500);
   };
 
-  // Placeholder handlers for future OAuth integrations
-  const handleGoogleLogin = () => {
-    // TODO: Implement Google OAuth
-    console.log("Google login coming soon");
-  };
-
-  const handleAppleLogin = () => {
-    // TODO: Implement Apple ID OAuth
-    console.log("Apple ID login coming soon");
-  };
-
-  const handleWeChatLogin = () => {
-    // TODO: Implement WeChat OAuth
-    console.log("WeChat login coming soon");
-  };
-
-  const handleXiaohongshuLogin = () => {
-    // TODO: Implement Xiaohongshu OAuth
-    console.log("Xiaohongshu login coming soon");
-  };
+  const socialLogins = [
+    { id: "wallet", icon: Wallet, label: "Wallet", desc: "MetaMask / WalletConnect" },
+    { id: "google", icon: Chrome, label: "Google", desc: "Sign in with Google" },
+    { id: "apple", icon: Apple, label: "Apple", desc: "Sign in with Apple" },
+  ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md p-8 bg-slate-800/50 border-slate-700 backdrop-blur-sm">
-        <div className="space-y-8">
-          {/* Header */}
-          <div className="text-center space-y-4">
-            <div className="inline-block">
-              <h1 className="text-3xl font-bold text-white">欢迎使用 projectX</h1>
-            </div>
-            <p className="text-slate-400 text-lg">
-              登录以访问您的影响力变现平台
+    <PageLayout>
+      <Section>
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-8">
+            <h1 className={cn(
+              'text-3xl md:text-4xl font-extrabold mb-3',
+              theme === 'cyberpunk' ? 'font-orbitron' : 'font-fredoka'
+            )}>
+              Login
+            </h1>
+            <p className="text-sm opacity-70">
+              登录到您的 ProofOfInfluence 账户
             </p>
           </div>
 
-          {/* Login Options */}
-          <div className="space-y-4">
-            {/* Current: Replit Auth */}
-            <Button
-              onClick={handleReplitLogin}
-              className="w-full bg-white text-slate-900 hover:bg-slate-100 py-6 text-lg font-semibold"
-              size="lg"
-            >
-              使用 Replit 登录
-            </Button>
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Email/Password Login */}
+            <ThemedCard className="p-6">
+              <h3 className={cn(
+                'text-lg font-bold mb-4',
+                theme === 'cyberpunk' ? 'font-rajdhani text-cyan-200' : 'font-poppins text-slate-900'
+              )}>
+                账号登录
+              </h3>
 
-            {/* Divider */}
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-700"></div>
+              <form onSubmit={handleEmailLogin} className="space-y-4">
+                <ThemedInput
+                  type="email"
+                  label="邮箱地址"
+                  placeholder="you@example.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                />
+
+                <ThemedInput
+                  type="password"
+                  label="密码"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                />
+
+                <div className="flex items-center justify-between text-xs">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      className={cn(
+                        'rounded',
+                        theme === 'cyberpunk'
+                          ? 'border-cyan-400/30'
+                          : 'border-slate-300'
+                      )}
+                    />
+                    <span>记住我</span>
+                  </label>
+                  <a
+                    href="#"
+                    className={cn(
+                      'hover:underline',
+                      theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
+                    )}
+                  >
+                    忘记密码？
+                  </a>
+                </div>
+
+                <ThemedButton
+                  type="submit"
+                  emphasis
+                  size="lg"
+                  className="w-full"
+                  disabled={loading}
+                >
+                  {loading ? "登录中..." : "登录"}
+                  {!loading && <ArrowRight className="w-4 h-4 ml-2" />}
+                </ThemedButton>
+
+                <div className="text-center text-xs opacity-70">
+                  还没有账号？{" "}
+                  <a
+                    href="/early-bird"
+                    className={cn(
+                      'font-semibold hover:underline',
+                      theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
+                    )}
+                  >
+                    立即注册
+                  </a>
+                </div>
+              </form>
+            </ThemedCard>
+
+            {/* Web3 / Social Login */}
+            <ThemedCard className="p-6">
+              <h3 className={cn(
+                'text-lg font-bold mb-4',
+                theme === 'cyberpunk' ? 'font-rajdhani text-cyan-200' : 'font-poppins text-slate-900'
+              )}>
+                快速登录
+              </h3>
+
+              <div className="space-y-3">
+                {/* Wallet Connect */}
+                <div>
+                  <WalletConnectButton />
+                </div>
+
+                {/* Social Logins */}
+                {socialLogins.slice(1).map((social) => {
+                  const Icon = social.icon;
+                  return (
+                    <button
+                      key={social.id}
+                      className={cn(
+                        'w-full flex items-center gap-3 p-4 rounded-lg transition-all text-left',
+                        theme === 'cyberpunk'
+                          ? 'border border-cyan-400/30 hover:bg-cyan-400/10 hover:border-cyan-400/50'
+                          : 'border border-slate-200 hover:bg-slate-50 hover:shadow-md'
+                      )}
+                    >
+                      <Icon className="w-6 h-6" />
+                      <div>
+                        <div className="font-semibold">{social.label}</div>
+                        <div className="text-xs opacity-70">{social.desc}</div>
+                      </div>
+                    </button>
+                  );
+                })}
               </div>
-              <div className="relative flex justify-center text-sm">
-                <span className="px-4 bg-slate-800/50 text-slate-500">
-                  更多登录方式即将推出
-                </span>
+
+              <div className={cn(
+                'mt-6 p-3 rounded-lg text-xs',
+                theme === 'cyberpunk'
+                  ? 'bg-cyan-400/10 border border-cyan-400/30'
+                  : 'bg-blue-50 border border-blue-200'
+              )}>
+                <div className="flex items-start gap-2">
+                  <Lock className={cn(
+                    'w-4 h-4 mt-0.5 flex-shrink-0',
+                    theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'
+                  )} />
+                  <div className="opacity-90">
+                    您的登录信息经过加密保护。我们不会存储您的私钥。
+                  </div>
+                </div>
               </div>
-            </div>
-
-            {/* Future OAuth Options (disabled for now) */}
-            <div className="space-y-3 opacity-50">
-              <Button
-                onClick={handleGoogleLogin}
-                disabled
-                variant="outline"
-                className="w-full border-slate-700 py-6 text-slate-400"
-                size="lg"
-              >
-                <Chrome className="mr-3 h-5 w-5" />
-                使用 Google 登录
-              </Button>
-
-              <Button
-                onClick={handleAppleLogin}
-                disabled
-                variant="outline"
-                className="w-full border-slate-700 py-6 text-slate-400"
-                size="lg"
-              >
-                <Apple className="mr-3 h-5 w-5" />
-                使用 Apple ID 登录
-              </Button>
-
-              <Button
-                onClick={handleWeChatLogin}
-                disabled
-                variant="outline"
-                className="w-full border-slate-700 py-6 text-slate-400"
-                size="lg"
-              >
-                <MessageCircle className="mr-3 h-5 w-5" />
-                使用微信登录
-              </Button>
-
-              <Button
-                onClick={handleXiaohongshuLogin}
-                disabled
-                variant="outline"
-                className="w-full border-slate-700 py-6 text-slate-400"
-                size="lg"
-              >
-                <SiXiaohongshu className="mr-3 h-5 w-5" />
-                使用小红书登录
-              </Button>
-            </div>
-          </div>
-
-          {/* Footer */}
-          <div className="text-center text-sm text-slate-500">
-            <p>
-              登录即表示您同意我们的{" "}
-              <a href="/compliance" className="text-slate-400 hover:text-white transition-colors">
-                服务条款
-              </a>{" "}
-              和{" "}
-              <a href="/compliance" className="text-slate-400 hover:text-white transition-colors">
-                隐私政策
-              </a>
-            </p>
+            </ThemedCard>
           </div>
         </div>
-      </Card>
-
-      {/* Background decoration */}
-      <div className="absolute inset-0 -z-10 overflow-hidden">
-        <div className="absolute -top-1/2 -left-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
-        <div className="absolute -bottom-1/2 -right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
-      </div>
-    </div>
+      </Section>
+    </PageLayout>
   );
 }
-
