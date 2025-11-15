@@ -1,17 +1,26 @@
-import React from "react";
+import React, { useState } from "react";
 import { Link } from "wouter";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Section } from "@/components/layout/Section";
 import { ThemedCard, ThemedButton, ThemedBadge } from "@/components/themed";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { AlertCircle, Brain, Zap, Coins, Activity, ArrowRight, Shield } from "lucide-react";
+import { AlertCircle, Brain, Zap, Coins, Activity, ArrowRight, Shield, Award, Loader2 } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+import { ImmortalityChat } from "@/components/ImmortalityChat";
 
 interface ImmortalityBalanceResponse {
   credits: number;
   poiCredits: number;
+}
+
+interface UserMemory {
+  id: number;
+  text: string;
+  emotion?: string | null;
+  createdAt: string;
 }
 
 const mockHistory = [
@@ -36,11 +45,45 @@ const mockHistory = [
 export default function Immortality() {
   const { theme } = useTheme();
   const { user, isAuthenticated } = useAuth();
+  const { toast } = useToast();
+  const [memoryText, setMemoryText] = useState("");
+  const [emotion, setEmotion] = useState("");
+  const [badgeStatus, setBadgeStatus] = useState<"idle" | "pending" | "success" | "error">("idle");
+  const [badgeTx, setBadgeTx] = useState<string | null>(null);
 
   const { data: balance, isFetching } = useQuery<ImmortalityBalanceResponse>({
     queryKey: ["/api/immortality/balance"],
     enabled: isAuthenticated,
   });
+
+  const { data: memories, refetch: refetchMemories } = useQuery<UserMemory[]>({
+    queryKey: ["/api/me/memories"],
+    enabled: isAuthenticated,
+  });
+
+  const memoryMutation = useMutation({
+    mutationFn: async (payload: { text: string; emotion?: string }) => {
+      const res = await fetch("/api/me/memories", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to create memory");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      setMemoryText("");
+      setEmotion("");
+      refetchMemories();
+      toast({ title: "记忆已保存", description: "赛博档案已更新" });
+    },
+    onError: () => {
+      toast({ title: "保存失败", description: "请稍后再试", variant: "destructive" });
+    },
+  });
+  const memoryPending = memoryMutation.status === "pending";
 
   const credits = balance?.credits ?? 0;
   const poiCredits = balance?.poiCredits ?? 0;
@@ -145,6 +188,132 @@ export default function Immortality() {
 
           <ThemedCard className="p-6 space-y-4">{consciousnessCTA}</ThemedCard>
         </div>
+      </Section>
+
+      <Section title="今日记忆" subtitle="写下此刻的情绪与片段，赛博分身会记住它们">
+        <div className="grid gap-6 lg:grid-cols-2">
+          <ThemedCard className="p-6 space-y-4">
+            <textarea
+              className={cn(
+                "w-full rounded-xl border bg-transparent p-3 text-sm outline-none focus:ring-2",
+                theme === "cyberpunk"
+                  ? "border-cyan-500/40 focus:ring-cyan-400/40"
+                  : "border-slate-200 focus:ring-blue-200",
+              )}
+              rows={4}
+              placeholder="记录今天让你印象深刻的一件事..."
+              value={memoryText}
+              onChange={(e) => setMemoryText(e.target.value)}
+            />
+            <div className="flex items-center gap-3">
+              <label className="text-sm opacity-70">情绪</label>
+              <select
+                className={cn(
+                  "flex-1 rounded-xl border bg-transparent p-2 text-sm",
+                  theme === "cyberpunk" ? "border-cyan-500/40" : "border-slate-200",
+                )}
+                value={emotion}
+                onChange={(e) => setEmotion(e.target.value)}
+              >
+                <option value="">选择情绪</option>
+                <option value="joy">喜悦</option>
+                <option value="calm">平静</option>
+                <option value="tired">疲惫</option>
+                <option value="stressed">压力</option>
+              </select>
+              <ThemedButton
+                emphasis
+                disabled={!memoryText.trim() || memoryPending}
+                onClick={() =>
+                  memoryMutation.mutate({
+                    text: memoryText.trim(),
+                    emotion: emotion || undefined,
+                  })
+                }
+              >
+                {memoryPending ? "保存中..." : "保存"}
+              </ThemedButton>
+            </div>
+          </ThemedCard>
+
+          <ThemedCard className="p-6 space-y-4">
+            {memories && memories.length > 0 ? (
+              <div className="space-y-4">
+                {memories.slice(0, 6).map((memo) => (
+                  <div
+                    key={memo.id}
+                    className={cn(
+                      "rounded-xl border p-4 text-sm",
+                      theme === "cyberpunk" ? "border-cyan-500/20" : "border-slate-200",
+                    )}
+                  >
+                    <div className="flex items-center justify-between text-xs opacity-60">
+                      <span>{new Date(memo.createdAt).toLocaleString()}</span>
+                      {memo.emotion && <span>{memo.emotion}</span>}
+                    </div>
+                    <p className="mt-2 whitespace-pre-wrap leading-relaxed">{memo.text}</p>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm opacity-70">写下第一条记忆后，这里会展示最近的片段。</p>
+            )}
+          </ThemedCard>
+        </div>
+      </Section>
+
+      <Section title="测试徽章" subtitle="让赛博分身在 Base Sepolia 上为你铸下一枚纪念徽章">
+        <ThemedCard className="p-6 space-y-4">
+          <div className="flex items-center gap-2">
+            <Award className="w-5 h-5" />
+            <span className="font-semibold">Test Immortality Badge</span>
+          </div>
+          <p className="text-sm opacity-80">
+            点击下方按钮即可触发链上动作（Base Sepolia），铸造一枚仅属于你的测试徽章。需要先在“钱包”里绑定 Base
+            地址。
+          </p>
+          <div className="flex items-center gap-3">
+            <ThemedButton
+              emphasis
+              disabled={badgeStatus === "pending"}
+              onClick={async () => {
+                try {
+                  setBadgeStatus("pending");
+                  setBadgeTx(null);
+                  const res = await fetch("/api/immortality/actions/mint-test-badge", { method: "POST" });
+                  if (!res.ok) {
+                    throw new Error("调用失败");
+                  }
+                  const data = await res.json();
+                  setBadgeStatus("success");
+                  setBadgeTx(data.txHash);
+                  toast({ title: "徽章已铸造", description: "链上交易已提交" });
+                } catch (error: any) {
+                  setBadgeStatus("error");
+                  toast({ title: "铸造失败", description: error?.message ?? "请稍后再试", variant: "destructive" });
+                }
+              }}
+            >
+              {badgeStatus === "pending" && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              {badgeStatus === "pending" ? "处理中..." : "铸造徽章"}
+            </ThemedButton>
+            {badgeStatus === "success" && badgeTx && (
+              <a
+                href={`https://sepolia.basescan.org/tx/${badgeTx}`}
+                target="_blank"
+                rel="noreferrer"
+                className="text-xs text-primary hover:underline"
+              >
+                查看交易
+              </a>
+            )}
+            {badgeStatus === "error" && <span className="text-xs text-red-400">请稍后重试</span>}
+          </div>
+        </ThemedCard>
+      </Section>
+
+      <Section title="与赛博分身对话" subtitle="分身会结合人格档案和最近记忆，给予建议与陪伴">
+        <ImmortalityChat />
       </Section>
 
       <Section title="账本与上链记录" subtitle="Ledger、Credits、以及每一次意识上链的足迹">

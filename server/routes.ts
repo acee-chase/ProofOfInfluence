@@ -9,6 +9,9 @@ import { stripe } from "./stripe";
 import { registerMarketRoutes } from "./routes/market";
 import { registerReservePoolRoutes } from "./routes/reservePool";
 import { registerMerchantRoutes } from "./routes/merchant";
+import { mintTestBadge } from "./agentkit";
+import { generateImmortalityReply } from "./chatbot/generateReply";
+import { z } from "zod";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 const tgeSaleAddress =
@@ -21,7 +24,7 @@ const tgeRpcUrl =
   process.env.BASE_RPC_URL ||
   process.env.VITE_BASE_RPC_URL ||
   "https://mainnet.base.org";
-const tgeProvider = new ethers.JsonRpcProvider(tgeRpcUrl);
+const tgeProvider = new ethers.providers.JsonRpcProvider(tgeRpcUrl);
 const tgeSaleAbi = [
   "function purchase(uint256 usdcAmount, bytes32[] calldata proof)",
   "function currentTier() view returns (uint256)",
@@ -156,6 +159,159 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error updating profile:", error);
       res.status(400).json({ message: "Failed to update profile" });
+    }
+  });
+
+  const personalitySchema = z.object({
+    mbtiType: z.string().max(4).optional(),
+    mbtiScores: z
+      .record(z.number().min(0).max(1))
+      .optional(),
+    values: z
+      .record(z.number().min(0).max(1))
+      .optional(),
+  });
+
+  app.get("/api/me/personality", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const profile = await storage.getUserPersonalityProfile(userId);
+      res.json(profile ?? null);
+    } catch (error) {
+      console.error("Error fetching personality profile:", error);
+      res.status(500).json({ message: "Failed to fetch personality profile" });
+    }
+  });
+
+  app.post("/api/me/personality", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validated = personalitySchema.parse(req.body);
+      const profile = await storage.upsertUserPersonalityProfile({
+        userId,
+        mbtiType: validated.mbtiType ?? null,
+        mbtiScores: validated.mbtiScores ?? null,
+        values: validated.values ?? null,
+      });
+      res.json(profile);
+    } catch (error: any) {
+      console.error("Error saving personality profile:", error);
+      res.status(400).json({ message: "Failed to save personality profile", details: error.message });
+    }
+  });
+
+  const memorySchema = z.object({
+    text: z.string().min(1).max(2000),
+    emotion: z.string().max(32).optional(),
+  });
+  const chatMessageSchema = z.object({
+    message: z.string().min(1),
+  });
+
+  app.get("/api/me/memories", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const limit = Number(req.query.limit) || 20;
+      const cappedLimit = Math.min(Math.max(limit, 1), 50);
+      const memories = await storage.listUserMemories({ userId, limit: cappedLimit });
+      res.json(memories);
+    } catch (error) {
+      console.error("Error fetching memories:", error);
+      res.status(500).json({ message: "Failed to fetch memories" });
+    }
+  });
+
+  app.post("/api/me/memories", isAuthenticated, async (req: any, res) => {
+    try {
+      const userId = req.user.claims.sub;
+      const validated = memorySchema.parse(req.body);
+      const memory = await storage.createUserMemory({
+        userId,
+        text: validated.text,
+        emotion: validated.emotion ?? null,
+        tags: null,
+        mediaUrl: null,
+      });
+      res.json(memory);
+    } catch (error: any) {
+      console.error("Error creating memory:", error);
+      res.status(400).json({ message: "Failed to create memory", details: error.message });
+    }
+  });
+
+  app.post("/api/chat", isAuthenticated, async (req: any, res) => {
+    const openAiKey = process.env.OPENAI_API_KEY;
+    if (!openAiKey) {
+      return res.status(503).json({ message: "Chat service not configured" });
+    }
+
+    let body;
+    try {
+      body = chatMessageSchema.parse(req.body);
+    } catch (error: any) {
+      return res.status(400).json({ message: error?.message ?? "Invalid request" });
+    }
+
+    const userId = req.user.claims.sub;
+    try {
+      const [profile, memories] = await Promise.all([
+        storage.getUserPersonalityProfile(userId),
+        storage.listUserMemories({ userId, limit: 10 }),
+      ]);
+
+      const { reply, suggestedActions } = await generateImmortalityReply({
+        message: body.message,
+        profile,
+        memories,
+        apiKey: openAiKey,
+        modelName: process.env.OPENAI_MODEL,
+      });
+
+      res.json({
+        reply,
+        profileUsed: !!profile,
+        memoryCount: memories.length,
+        suggestedActions,
+      });
+    } catch (error: any) {
+      console.error("Error generating chat reply:", error);
+      res.status(500).json({ message: "Failed to generate reply" });
+    }
+  });
+
+  app.post("/api/immortality/actions/mint-test-badge", isAuthenticated, async (req: any, res) => {
+    const userId = req.user.claims.sub;
+    try {
+      const user = await storage.getUser(userId);
+      if (!user || !user.walletAddress) {
+        return res.status(400).json({ message: "请先绑定钱包地址" });
+      }
+
+      const action = await storage.createAgentkitAction({
+        userId,
+        actionType: "MINT_TEST_BADGE",
+        status: "pending",
+        requestPayload: { badgeId: 1 },
+        metadata: { network: process.env.AGENTKIT_DEFAULT_CHAIN || "base-sepolia" },
+      });
+
+      try {
+        const txHash = await mintTestBadge(user.walletAddress);
+        await storage.updateAgentkitAction(action.id, {
+          status: "success",
+          txHash,
+        });
+        res.json({ actionId: action.id, status: "success", txHash });
+      } catch (err: any) {
+        await storage.updateAgentkitAction(action.id, {
+          status: "failed",
+          errorMessage: err?.message ?? "Unknown error",
+        });
+        throw err;
+      }
+    } catch (error: any) {
+      console.error("Error minting badge:", error);
+      res.status(500).json({ message: "Failed to mint badge", details: error?.message });
     }
   });
 

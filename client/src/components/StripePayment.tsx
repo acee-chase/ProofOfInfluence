@@ -53,9 +53,10 @@ export default function StripePayment({ disabled = false }: StripePaymentProps) 
       window.location.href = url;
     } catch (error) {
       console.error("Payment error:", error);
+      const message = error instanceof Error ? error.message : "";
       toast({
         title: "Payment failed",
-        description: error.message === "Unauthorized"
+        description: message === "Unauthorized"
           ? "Please sign in before purchasing credits."
           : "Unable to process payment. Please try again.",
         variant: "destructive",

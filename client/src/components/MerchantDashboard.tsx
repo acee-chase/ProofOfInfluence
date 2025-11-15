@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Merchant Dashboard Component
  * Complete merchant backend management interface

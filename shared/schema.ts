@@ -46,6 +46,31 @@ export const users = pgTable("users", {
   lastLoginAt: timestamp("last_login_at"),
 });
 
+// User personality profiles (MBTI + values)
+export const userPersonalityProfiles = pgTable("user_personality_profiles", {
+  userId: varchar("user_id")
+    .primaryKey()
+    .references(() => users.id, { onDelete: "cascade" }),
+  mbtiType: varchar("mbti_type", { length: 4 }),
+  mbtiScores: jsonb("mbti_scores"),
+  values: jsonb("values"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+// User memories (short journal entries)
+export const userMemories = pgTable("user_memories", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  text: text("text").notNull(),
+  emotion: varchar("emotion", { length: 32 }),
+  tags: jsonb("tags"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  mediaUrl: text("media_url"),
+});
+
 // Profiles table - public showcase information
 export const profiles = pgTable("profiles", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -126,6 +151,20 @@ export const immortalityLedger = pgTable("immortality_ledger", {
   reference: varchar("reference"),
   metadata: jsonb("metadata"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// AgentKit action audit log
+export const agentkitActions = pgTable("agentkit_actions", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+  actionType: varchar("action_type", { length: 100 }).notNull(),
+  status: varchar("status", { length: 20 }).notNull().default("pending"),
+  txHash: varchar("tx_hash"),
+  errorMessage: text("error_message"),
+  requestPayload: jsonb("request_payload"),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
 // POI Tiers - membership levels based on POI balance/staking
@@ -383,6 +422,22 @@ export const insertImmortalityLedgerSchema = createInsertSchema(immortalityLedge
   createdAt: true,
 });
 
+export const insertUserPersonalityProfileSchema = createInsertSchema(userPersonalityProfiles).omit({
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertUserMemorySchema = createInsertSchema(userMemories).omit({
+  id: true,
+  createdAt: true,
+});
+
+export const insertAgentkitActionSchema = createInsertSchema(agentkitActions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
 export const insertPoiTierSchema = createInsertSchema(poiTiers).omit({
   id: true,
 });
@@ -469,6 +524,15 @@ export type InsertUserBalance = z.infer<typeof insertUserBalanceSchema>;
 export type UserBalance = typeof userBalances.$inferSelect;
 export type InsertImmortalityLedgerEntry = z.infer<typeof insertImmortalityLedgerSchema>;
 export type ImmortalityLedgerEntry = typeof immortalityLedger.$inferSelect;
+
+export type InsertUserPersonalityProfile = z.infer<typeof insertUserPersonalityProfileSchema>;
+export type UserPersonalityProfile = typeof userPersonalityProfiles.$inferSelect;
+
+export type InsertUserMemory = z.infer<typeof insertUserMemorySchema>;
+export type UserMemory = typeof userMemories.$inferSelect;
+
+export type InsertAgentkitAction = z.infer<typeof insertAgentkitActionSchema>;
+export type AgentkitAction = typeof agentkitActions.$inferSelect;
 
 export type InsertPoiTier = z.infer<typeof insertPoiTierSchema>;
 export type PoiTier = typeof poiTiers.$inferSelect;

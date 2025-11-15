@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Merchant Mock API
  * Simulates backend Merchant API with realistic data

@@ -26,6 +26,9 @@ import {
   referralCodes,
   referrals,
   airdropEligibility,
+  userPersonalityProfiles,
+  userMemories,
+  agentkitActions,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -79,6 +82,12 @@ import {
   type InsertReferral,
   type AirdropEligibility,
   type InsertAirdropEligibility,
+  type UserPersonalityProfile,
+  type InsertUserPersonalityProfile,
+  type UserMemory,
+  type InsertUserMemory,
+  type AgentkitAction,
+  type InsertAgentkitAction,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, or, lte } from "drizzle-orm";
@@ -100,6 +109,14 @@ export interface IStorage {
   createProfile(profile: InsertProfile): Promise<Profile>;
   updateProfile(userId: string, updates: Partial<InsertProfile>): Promise<Profile>;
   incrementProfileViews(userId: string): Promise<void>;
+
+  // Personality & memories
+  getUserPersonalityProfile(userId: string): Promise<UserPersonalityProfile | undefined>;
+  upsertUserPersonalityProfile(
+    profile: InsertUserPersonalityProfile & { userId: string },
+  ): Promise<UserPersonalityProfile>;
+  listUserMemories(params: { userId: string; limit: number }): Promise<UserMemory[]>;
+  createUserMemory(memory: InsertUserMemory & { userId: string }): Promise<UserMemory>;
   
   // Link operations
   getLinks(userId: string): Promise<Link[]>;
@@ -227,6 +244,11 @@ export interface IStorage {
   getTaxReportByIdempotency(merchantId: string, idempotencyKey: string): Promise<TaxReport | undefined>;
   createTaxReport(report: InsertTaxReport): Promise<TaxReport>;
   updateTaxReport(reportId: string, updates: Partial<InsertTaxReport>): Promise<TaxReport>;
+
+  // AgentKit actions
+  createAgentkitAction(action: InsertAgentkitAction): Promise<AgentkitAction>;
+  updateAgentkitAction(id: string, updates: Partial<InsertAgentkitAction>): Promise<AgentkitAction>;
+  getAgentkitAction(id: string): Promise<AgentkitAction | undefined>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -314,6 +336,41 @@ export class DatabaseStorage implements IStorage {
       .update(profiles)
       .set({ totalViews: sql`${profiles.totalViews} + 1` })
       .where(eq(profiles.userId, userId));
+  }
+
+  // Personality & memories
+  async getUserPersonalityProfile(userId: string): Promise<UserPersonalityProfile | undefined> {
+    const [profile] = await db.select().from(userPersonalityProfiles).where(eq(userPersonalityProfiles.userId, userId));
+    return profile;
+  }
+
+  async upsertUserPersonalityProfile(
+    profile: InsertUserPersonalityProfile & { userId: string },
+  ): Promise<UserPersonalityProfile> {
+    const [record] = await db
+      .insert(userPersonalityProfiles)
+      .values(profile)
+      .onConflictDoUpdate({
+        target: userPersonalityProfiles.userId,
+        set: { ...profile, updatedAt: new Date() },
+      })
+      .returning();
+    return record;
+  }
+
+  async listUserMemories(params: { userId: string; limit: number }): Promise<UserMemory[]> {
+    const { userId, limit } = params;
+    return await db
+      .select()
+      .from(userMemories)
+      .where(eq(userMemories.userId, userId))
+      .orderBy(desc(userMemories.createdAt))
+      .limit(limit);
+  }
+
+  async createUserMemory(memory: InsertUserMemory & { userId: string }): Promise<UserMemory> {
+    const [record] = await db.insert(userMemories).values(memory).returning();
+    return record;
   }
 
   // Link operations
@@ -1415,6 +1472,26 @@ export class DatabaseStorage implements IStorage {
       .returning();
     
     return created;
+  }
+
+  // AgentKit actions
+  async createAgentkitAction(action: InsertAgentkitAction): Promise<AgentkitAction> {
+    const [record] = await db.insert(agentkitActions).values(action).returning();
+    return record;
+  }
+
+  async updateAgentkitAction(id: string, updates: Partial<InsertAgentkitAction>): Promise<AgentkitAction> {
+    const [record] = await db
+      .update(agentkitActions)
+      .set({ ...updates, updatedAt: new Date() })
+      .where(eq(agentkitActions.id, id))
+      .returning();
+    return record;
+  }
+
+  async getAgentkitAction(id: string): Promise<AgentkitAction | undefined> {
+    const [record] = await db.select().from(agentkitActions).where(eq(agentkitActions.id, id));
+    return record;
   }
 }
 
