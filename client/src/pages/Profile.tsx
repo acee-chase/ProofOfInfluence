@@ -1,22 +1,19 @@
-import React, { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import React, { useEffect, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Section } from "@/components/layout/Section";
 import { ThemedCard, ThemedButton, ThemedInput } from "@/components/themed";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
-import {
-  User,
-  Mail,
-  Palette,
-  Bell,
-  Shield,
-  Wallet,
-  Save,
-  LogOut,
-} from "lucide-react";
+import { User, Mail, Palette, Bell, Shield, Wallet, Save, LogOut, Brain, Lock } from "lucide-react";
 import type { User as UserType } from "@shared/schema";
+
+interface PersonalityProfile {
+  mbtiType?: string | null;
+  mbtiScores?: Record<string, number> | null;
+  values?: Record<string, number> | null;
+}
 
 export default function Profile() {
   const { theme, toggleTheme } = useTheme();
@@ -27,9 +24,58 @@ export default function Profile() {
     queryKey: ["/api/auth/user"],
   });
 
-  const [username, setUsername] = useState(user?.username || "");
-  const [email, setEmail] = useState(user?.email || "");
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
   const [notifications, setNotifications] = useState(true);
+  const [mbtiType, setMbtiType] = useState("");
+  const [exploration, setExploration] = useState(0.5);
+  const [safety, setSafety] = useState(0.5);
+
+  useEffect(() => {
+    if (user) {
+      setUsername(user.username ?? "");
+      setEmail(user.email ?? "");
+    }
+  }, [user]);
+
+  const { data: personality } = useQuery<PersonalityProfile>({
+    queryKey: ["/api/me/personality"],
+  });
+
+  useEffect(() => {
+    if (personality) {
+      setMbtiType(personality.mbtiType ?? "");
+      setExploration(personality.values?.exploration ?? 0.5);
+      setSafety(personality.values?.safety ?? 0.5);
+    }
+  }, [personality]);
+
+  const personalityMutation = useMutation({
+    mutationFn: async () => {
+      const payload = {
+        mbtiType: mbtiType || null,
+        values: {
+          exploration,
+          safety,
+        },
+      };
+      const res = await fetch("/api/me/personality", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        throw new Error("Failed to save personality");
+      }
+      return res.json();
+    },
+    onSuccess: () => {
+      toast({ title: "人格档案已更新" });
+    },
+    onError: () => {
+      toast({ title: "保存失败", description: "请稍后再试", variant: "destructive" });
+    },
+  });
 
   const handleSave = () => {
     toast({
@@ -89,6 +135,64 @@ export default function Profile() {
               <ThemedButton emphasis onClick={handleSave}>
                 <Save className="w-4 h-4 mr-2" />
                 保存更改
+              </ThemedButton>
+            </div>
+          </ThemedCard>
+
+          {/* Personality Profile */}
+          <ThemedCard className="p-6 mb-6">
+            <h3
+              className={cn(
+                "text-lg font-bold mb-4 flex items-center gap-2",
+                theme === "cyberpunk" ? "font-rajdhani text-cyan-200" : "font-poppins text-slate-900",
+              )}
+            >
+              <Brain className="w-5 h-5" />
+              赛博人格档案
+            </h3>
+            <div className="space-y-4">
+              <ThemedInput
+                label="MBTI 类型"
+                placeholder="例如 INFJ"
+                value={mbtiType}
+                onChange={(e) => setMbtiType(e.target.value.toUpperCase())}
+              />
+              <div>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span>探索欲</span>
+                  <span>{Math.round(exploration * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={exploration}
+                  onChange={(e) => setExploration(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              <div>
+                <div className="flex items-center justify-between text-sm mb-1">
+                  <span>安全感</span>
+                  <span>{Math.round(safety * 100)}%</span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={safety}
+                  onChange={(e) => setSafety(Number(e.target.value))}
+                  className="w-full"
+                />
+              </div>
+              <ThemedButton
+                emphasis
+                onClick={() => personalityMutation.mutate()}
+                disabled={personalityMutation.status === "pending"}
+              >
+                {personalityMutation.status === "pending" ? "保存中..." : "保存人格档案"}
               </ThemedButton>
             </div>
           </ThemedCard>

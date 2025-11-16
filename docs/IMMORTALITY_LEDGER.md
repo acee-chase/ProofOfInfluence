@@ -9,6 +9,9 @@ Layer 2 负责把法币 inflow 记入中心化账本，确保随时可兑/可审
 | `fiat_transactions` | 记录每次 Stripe Checkout：金额、币种、状态、credits 数量、Stripe session id |
 | `user_balances` | 每个用户的 Immortality Credits / 待发 POI（1 行 1 个 userId） |
 | `immortality_ledger` | 账本明细，任何加/减 credits 都会留下 credit/debit 记录 |
+| `user_personality_profiles` | 用户人格档案（MBTI 类型、维度得分、价值观）供赛博分身使用 |
+| `user_memories` | 记忆记录（文本、情绪、时间戳），驱动 Chatbot 场景 |
+| `agentkit_actions` | AgentKit 动作日志（动作类型、状态、tx hash、错误、payload），审计链上执行 |
 
 ## API & 流程
 
@@ -44,6 +47,7 @@ Webhook 在 `server/routes.ts` 中复用了 `/api/stripe-webhook` 与 `/api/stri
 - `fiat_transactions`：查看每笔 Stripe session 状态与 credits。
 - `user_balances`：对应用户当前余额。
 - `immortality_ledger`：详细的 credit/debit 记录，可用来重建余额或导出 CSV。
+- `agentkit_actions`：每一次链上动作（如铸徽章、充值、交易）都会在此写入 pending→success/failed，包含 tx hash 与错误信息，便于赛博分身、运营和合规回溯。
 
 ## 与 Layer 1 的关系
 
@@ -52,11 +56,13 @@ Immortality Credits 只是进入 POI 经济的另一扇门：
 1. Crypto 用户（Layer 1）直接在 `/market` 使用 TGESale 合约购入 POI；
 2. Web2 用户（Layer 2）通过 Stripe 获得 credits，稍后可兑换 POI 或在 Immortality 产品内直接消费；
 3. 所有消费/兑换最终都会进入 `user_balances` / `immortality_ledger`，与智能合约产生的 POI 保持 1:1 经济关系。
+4. 赛博分身触发的链上动作（通过 AgentKit）会同步写入 `agentkit_actions`，必要时映射回 `immortality_ledger`，形成完整闭环。
 
 前端入口在 `/immortality` 页面：  
 - Immortality Balance 模块读取 `/api/immortality/balance` 并展示 Credits；  
 - “Recharge Credits” 按钮跳转到 `/recharge`（Stripe 流程）；  
-- “Consciousness Upload” 卡片预留消费 Credits 的 UI。  
+- “Consciousness Upload” 卡片预留消费 Credits 的 UI；  
+- “今日记忆” + “赛博分身对话” 区块读写 `user_memories` / `/api/chat`，若触发链上动作则由 AgentKit 调用并写入 `agentkit_actions`。
 
 > 只要遵守“法币→Ledger→链上/产品”的顺序，就能在上线初期兼顾合规与业务速度。
 

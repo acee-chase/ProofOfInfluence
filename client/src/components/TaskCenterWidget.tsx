@@ -195,7 +195,7 @@ export default function TaskCenterWidget() {
                     </p>
                     {!completed && task.actionLink && (
                       <Link href={task.actionLink}>
-                        <Button size="sm" variant="link" className="h-auto p-0 text-blue-600 dark:text-blue-400">
+                        <Button size="sm" variant="ghost" className="h-auto p-0 text-blue-600 dark:text-blue-400">
                           {task.actionText || "开始"}
                           <ArrowRight className="ml-1 w-3 h-3" />
                         </Button>

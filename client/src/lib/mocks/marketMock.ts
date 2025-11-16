@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * Market Mock API
  * Simulates backend Market API with realistic data

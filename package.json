@@ -17,8 +17,11 @@
     "deploy:all": "hardhat run scripts/deploy-and-add-liquidity.ts --config hardhat.config.cjs"
   },
   "dependencies": {
+    "@coinbase/agentkit": "^0.2.3",
+    "@coinbase/agentkit-langchain": "^0.2.3",
     "@hookform/resolvers": "^3.10.0",
     "@jridgewell/trace-mapping": "^0.3.25",
+    "@langchain/openai": "^0.6.16",
     "@neondatabase/serverless": "^0.10.4",
     "@openzeppelin/contracts": "^5.0.0",
     "@openzeppelin/contracts-upgradeable": "^5.0.0",
@@ -72,6 +75,7 @@
     "framer-motion": "^11.13.1",
     "http-proxy-middleware": "^3.0.5",
     "input-otp": "^1.4.2",
+    "langchain": "^0.3.36",
     "lucide-react": "^0.453.0",
     "memoizee": "^0.4.17",
     "memorystore": "^1.6.7",

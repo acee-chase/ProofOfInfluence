@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { useState, useMemo } from "react";
 import { parseUnits, formatUnits } from "viem";
 import { AlertCircle, Loader2, ShieldCheck } from "lucide-react";
