@@ -13,6 +13,7 @@ import {
   Search,
   Filter,
 } from "lucide-react";
+import CompactSwapCard from "@/components/CompactSwapCard";
 
 export default function Market() {
   const { theme } = useTheme();
@@ -79,6 +80,10 @@ export default function Market() {
 
   return (
     <PageLayout>
+      <Section>
+        <CompactSwapCard />
+      </Section>
+
       {/* Header Section */}
       <Section>
         <div className="flex items-center justify-between mb-6">
