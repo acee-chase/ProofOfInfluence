@@ -68,18 +68,46 @@ export async function setupVite(app: Express, server: Server) {
 }
 
 export function serveStatic(app: Express) {
-  const distPath = path.resolve(import.meta.dirname, "public");
+  // Try multiple possible paths for the static files
+  // 1. Relative to compiled file (dist/public when server/vite.ts -> dist/vite.js)
+  const distPath1 = path.resolve(import.meta.dirname, "public");
+  // 2. Relative to current working directory (for Render and other deployments)
+  const distPath2 = path.resolve(process.cwd(), "dist", "public");
+  // 3. Absolute path from project root (fallback)
+  const distPath3 = path.resolve(process.cwd(), "public");
 
-  if (!fs.existsSync(distPath)) {
+  let distPath: string | null = null;
+  
+  if (fs.existsSync(distPath1)) {
+    distPath = distPath1;
+  } else if (fs.existsSync(distPath2)) {
+    distPath = distPath2;
+  } else if (fs.existsSync(distPath3)) {
+    distPath = distPath3;
+  }
+
+  if (!distPath) {
     throw new Error(
-      `Could not find the build directory: ${distPath}, make sure to build the client first`,
+      `Could not find the build directory. Tried:\n` +
+      `  - ${distPath1}\n` +
+      `  - ${distPath2}\n` +
+      `  - ${distPath3}\n` +
+      `Make sure to build the client first with 'npm run build'`
     );
   }
 
+  log(`[Static] Serving static files from: ${distPath}`);
   app.use(express.static(distPath));
 
   // fall through to index.html if the file doesn't exist
+  // This enables client-side routing (React Router)
   app.use("*", (_req, res) => {
-    res.sendFile(path.resolve(distPath, "index.html"));
+    const indexPath = path.resolve(distPath, "index.html");
+    if (!fs.existsSync(indexPath)) {
+      log(`[Static] Error: index.html not found at ${indexPath}`);
+      res.status(500).send("Static files not found. Please rebuild the application.");
+      return;
+    }
+    res.sendFile(indexPath);
   });
 }

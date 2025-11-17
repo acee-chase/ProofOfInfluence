@@ -1,4 +1,5 @@
 // Replit Auth integration - from blueprint:javascript_log_in_with_replit
+// NOTE: Replit Auth is now optional - if REPL_ID is not set, auth will be disabled
 import * as client from "openid-client";
 import { Strategy, type VerifyFunction } from "openid-client/passport";
 
@@ -9,8 +10,16 @@ import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
 
+// Check if Replit Auth is enabled
+export const isReplitAuthEnabled = (): boolean => {
+  return !!process.env.REPL_ID && process.env.REPL_ID.trim() !== "";
+};
+
 const getOidcConfig = memoize(
   async () => {
+    if (!isReplitAuthEnabled()) {
+      throw new Error("Replit Auth is not enabled: REPL_ID is not set");
+    }
     return await client.discovery(
       new URL(process.env.ISSUER_URL ?? "https://replit.com/oidc"),
       process.env.REPL_ID!
@@ -69,6 +78,40 @@ export async function setupAuth(app: Express) {
   app.use(passport.initialize());
   app.use(passport.session());
 
+  // Only setup Replit Auth if REPL_ID is configured
+  if (!isReplitAuthEnabled()) {
+    console.warn("[Auth] Replit Auth is disabled: REPL_ID is not set. Authentication will be limited.");
+    console.warn("[Auth] To bypass authentication for testing, set AUTH_BYPASS=true or DEV_MODE_AUTH_BYPASS=true");
+    
+    // Setup basic passport serialization even without Replit Auth
+    passport.serializeUser((user: Express.User, cb) => cb(null, user));
+    passport.deserializeUser((user: Express.User, cb) => cb(null, user));
+    
+    // Provide placeholder routes that return appropriate errors
+    app.get("/api/login", (req, res) => {
+      res.status(503).json({ 
+        message: "Replit Auth is not configured. Please set REPL_ID environment variable.",
+        error: "AUTH_NOT_CONFIGURED"
+      });
+    });
+    
+    app.get("/api/callback", (req, res) => {
+      res.status(503).json({ 
+        message: "Replit Auth is not configured. Please set REPL_ID environment variable.",
+        error: "AUTH_NOT_CONFIGURED"
+      });
+    });
+    
+    app.get("/api/logout", (req, res) => {
+      req.logout(() => {
+        res.redirect("/");
+      });
+    });
+    
+    return;
+  }
+
+  // Replit Auth is enabled, proceed with normal setup
   const config = await getOidcConfig();
 
   const verify: VerifyFunction = async (
@@ -134,6 +177,37 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
+  // Auth bypass: Allow bypassing auth if explicitly enabled (for migration from Replit)
+  // This is useful when migrating away from Replit Auth to another auth system
+  const authBypass = process.env.DEV_MODE_AUTH_BYPASS === 'true' || process.env.AUTH_BYPASS === 'true';
+  
+  if (!isReplitAuthEnabled()) {
+    // If Replit Auth is not enabled, check for bypass
+    if (authBypass) {
+      console.warn("[Auth] Authentication bypass enabled (DEV_MODE_AUTH_BYPASS or AUTH_BYPASS is set)");
+      // Create a mock user for development/testing
+      if (!req.user) {
+        (req as any).user = {
+          claims: {
+            sub: process.env.AUTH_BYPASS_USER_ID || 'dev-user',
+            email: process.env.AUTH_BYPASS_USER_EMAIL || 'dev@example.com',
+            first_name: process.env.AUTH_BYPASS_USER_FIRST_NAME || 'Dev',
+            last_name: process.env.AUTH_BYPASS_USER_LAST_NAME || 'User',
+          },
+          expires_at: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+        };
+      }
+      return next();
+    }
+    
+    // When bypass is disabled, return error
+    return res.status(503).json({ 
+      message: "Authentication is not configured. Please set REPL_ID environment variable or enable AUTH_BYPASS=true for testing.",
+      error: "AUTH_NOT_CONFIGURED"
+    });
+  }
+
+  // Normal Replit Auth flow
   const user = req.user as any;
 
   if (!req.isAuthenticated() || !user.expires_at) {
