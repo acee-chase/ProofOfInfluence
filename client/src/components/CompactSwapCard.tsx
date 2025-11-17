@@ -2,11 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { parseUnits, formatUnits, maxUint256 } from "viem";
 import { useAccount, useBalance, usePublicClient, useReadContract, useWriteContract } from "wagmi";
 import { base } from "wagmi/chains";
-import { ArrowLeftRight, Info, Loader2 } from "lucide-react";
+import { ArrowDownUp, Loader2, AlertCircle, ExternalLink, RefreshCw } from "lucide-react";
 import { useAppKit } from "@reown/appkit/react";
-import { Button } from "./ui/button";
+import { ThemedCard, ThemedButton } from "@/components/themed";
 import { Input } from "./ui/input";
+import { Alert, AlertDescription } from "./ui/alert";
 import { useToast } from "@/hooks/use-toast";
+import { useTheme } from "@/contexts/ThemeContext";
+import { cn } from "@/lib/utils";
 import {
   BASESWAP_ROUTER_ADDRESS,
   ERC20_ABI,
@@ -21,6 +24,7 @@ const SLIPPAGE_BPS = 100; // 1%
 
 export default function CompactSwapCard() {
   const { toast } = useToast();
+  const { theme } = useTheme();
   const { open } = useAppKit();
   const { address, isConnected, chain } = useAccount();
   const publicClient = usePublicClient({ chainId: base.id });
@@ -226,14 +230,14 @@ export default function CompactSwapCard() {
   }, [amountInWei, fromToken, ethBalance, usdcBalance]);
 
   const buttonLabel = (() => {
-    if (!isConnected) return "Connect Wallet";
-    if (!isCorrectNetwork) return "Switch to Base";
-    if (!amountIn || !amountInWei) return "Enter an amount";
-    if (insufficientBalance) return `Insufficient ${fromToken}`;
-    if (needsApproval) return isApproving ? "Approving..." : "Approve USDC";
-    if (isSwapping) return "Swapping...";
-    if (!amountOutWei) return "Fetching price...";
-    return "Swap";
+    if (!isConnected) return "连接钱包以交易";
+    if (!isCorrectNetwork) return "请切换到 Base 网络";
+    if (!amountIn || !amountInWei) return "输入金额";
+    if (insufficientBalance) return `余额不足`;
+    if (needsApproval) return isApproving ? "授权中..." : "授权 USDC";
+    if (isSwapping) return "交易中...";
+    if (!amountOutWei || isFetchingQuote) return "获取报价中...";
+    return "兑换";
   })();
 
   const actionDisabled = (() => {
@@ -261,154 +265,321 @@ export default function CompactSwapCard() {
     handleSwap();
   };
 
-  const resetAmounts = () => {
+  const switchTokens = () => {
+    setFromToken((prev) => (prev === "ETH" ? "USDC" : "ETH"));
     setAmountIn("");
     setAmountOut("");
     setQuoteError(null);
   };
 
-  const setDirection = (direction: "ETH" | "USDC") => {
-    if (direction === fromToken) return;
-    setFromToken(direction);
-    resetAmounts();
+  const setMaxAmount = () => {
+    if (!address || !isCorrectNetwork) return;
+    const balance = fromToken === "ETH" ? ethBalance : usdcBalance;
+    if (balance) {
+      setAmountIn(formatDisplayAmount(balance.formatted, fromToken));
+    }
   };
 
-  const handleSwitchDirection = () => {
-    setFromToken((prev) => (prev === "ETH" ? "USDC" : "ETH"));
-    resetAmounts();
-  };
+  const fromBalanceFormatted = fromToken === "ETH"
+    ? (ethBalance ? parseFloat(ethBalance.formatted).toFixed(6) : "0.0")
+    : (usdcBalance ? parseFloat(usdcBalance.formatted).toFixed(2) : "0.0");
 
-  const fromBalanceDisplay = fromToken === "ETH"
-    ? formatBalanceDisplay(ethBalance?.formatted, 4)
-    : formatBalanceDisplay(usdcBalance?.formatted, 2);
-  const toBalanceDisplay = toToken === "ETH"
-    ? formatBalanceDisplay(ethBalance?.formatted, 4)
-    : formatBalanceDisplay(usdcBalance?.formatted, 2);
+  const exchangeRate = useMemo(() => {
+    if (!amountIn || !amountOut || parseFloat(amountIn) <= 0 || parseFloat(amountOut) <= 0) return null;
+    return parseFloat(amountOut) / parseFloat(amountIn);
+  }, [amountIn, amountOut]);
+
+  const priceImpact = useMemo(() => {
+    // Simple price impact calculation (can be improved with actual pool reserves)
+    if (!exchangeRate) return "0";
+    // Assuming ETH/USDC rate is around 2500
+    const expectedRate = fromToken === "ETH" ? 2500 : 1 / 2500;
+    const impact = Math.abs((exchangeRate - expectedRate) / expectedRate * 100);
+    return impact.toFixed(2);
+  }, [exchangeRate, fromToken]);
 
   return (
-    <div className="w-full rounded-2xl border border-slate-800/80 bg-slate-900/70 p-5 shadow-lg shadow-slate-900/40">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-xs uppercase tracking-wide text-slate-400">Base Mainnet</p>
-          <h2 className="text-lg font-semibold text-white">ETH ⇄ USDC Swap</h2>
-        </div>
-        <Button
-          variant="outline"
-          size="icon"
-          className="rounded-full border-slate-700 bg-slate-800 text-slate-200 hover:bg-slate-700"
-          onClick={handleSwitchDirection}
+    <ThemedCard className="p-6">
+      <div className="flex justify-between items-center mb-6">
+        <h2 className={cn(
+          "text-xl font-semibold",
+          theme === 'cyberpunk' ? 'text-cyan-100' : 'text-slate-900'
+        )}>
+          兑换
+        </h2>
+        <ThemedButton
+          variant="ghost"
+          size="sm"
+          onClick={() => {
+            refetchEthBalance();
+            refetchUsdcBalance();
+          }}
+          disabled={!address || !isCorrectNetwork}
         >
-          <ArrowLeftRight className="h-4 w-4" />
-        </Button>
+          <RefreshCw className="w-4 h-4" />
+        </ThemedButton>
       </div>
 
-      <div className="mt-5 space-y-3">
-        <div className="grid grid-cols-2 gap-2 text-xs font-medium">
-          <button
-            type="button"
-            className={`rounded-xl border px-3 py-2 text-left ${
-              fromToken === "ETH"
-                ? "border-blue-500/70 bg-blue-500/10 text-white"
-                : "border-slate-700 bg-slate-800 text-slate-300"
-            }`}
-            onClick={() => setDirection("ETH")}
-          >
-            ETH → USDC
-          </button>
-          <button
-            type="button"
-            className={`rounded-xl border px-3 py-2 text-left ${
-              fromToken === "USDC"
-                ? "border-blue-500/70 bg-blue-500/10 text-white"
-                : "border-slate-700 bg-slate-800 text-slate-300"
-            }`}
-            onClick={() => setDirection("USDC")}
-          >
-            USDC → ETH
-          </button>
-        </div>
+      {!isConnected && (
+        <Alert className={cn(
+          "mb-4",
+          theme === 'cyberpunk' 
+            ? 'bg-slate-900/50 border-slate-700' 
+            : 'bg-slate-50 border-slate-200'
+        )}>
+          <AlertCircle className={cn(
+            "h-4 w-4",
+            theme === 'cyberpunk' ? 'text-slate-400' : 'text-slate-600'
+          )} />
+          <AlertDescription className={cn(
+            theme === 'cyberpunk' ? 'text-slate-300' : 'text-slate-700'
+          )}>
+            请先连接钱包以开始交易
+          </AlertDescription>
+        </Alert>
+      )}
 
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/50 p-4">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>From</span>
-            <span>Balance: {fromBalanceDisplay}</span>
-          </div>
-          <div className="mt-3 flex items-center gap-3">
+      {isConnected && !isCorrectNetwork && (
+        <Alert className={cn(
+          "mb-4",
+          theme === 'cyberpunk' 
+            ? 'bg-yellow-900/20 border-yellow-700' 
+            : 'bg-yellow-50 border-yellow-200'
+        )}>
+          <AlertCircle className={cn(
+            "h-4 w-4",
+            theme === 'cyberpunk' ? 'text-yellow-500' : 'text-yellow-600'
+          )} />
+          <AlertDescription className={cn(
+            "flex items-center justify-between",
+            theme === 'cyberpunk' ? 'text-yellow-200' : 'text-yellow-800'
+          )}>
+            <span>请切换到 Base 网络</span>
+            <ThemedButton size="sm" onClick={() => open?.({ view: "Networks" })} className="ml-2">
+              切换网络
+            </ThemedButton>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* From Token */}
+      <div className="space-y-2 mb-2">
+        <div className="flex justify-between text-sm">
+          <label className={cn(
+            theme === 'cyberpunk' ? 'text-slate-400' : 'text-slate-600'
+          )}>
+            卖出
+          </label>
+          {address && isCorrectNetwork && (
+            <button
+              onClick={setMaxAmount}
+              className={cn(
+                "transition-colors text-xs",
+                theme === 'cyberpunk' 
+                  ? 'text-slate-500 hover:text-slate-300' 
+                  : 'text-slate-500 hover:text-slate-700'
+              )}
+            >
+              余额: {fromBalanceFormatted} {fromToken}
+            </button>
+          )}
+        </div>
+        <div className="flex gap-2">
+          <Input
+            type="number"
+            placeholder="0.0"
+            value={amountIn}
+            onChange={(e) => setAmountIn(e.target.value)}
+            className={cn(
+              "text-lg h-14 flex-1",
+              theme === 'cyberpunk'
+                ? 'bg-slate-900 border-slate-700 text-white'
+                : 'bg-white border-slate-300 text-slate-900'
+            )}
+            disabled={!address || !isCorrectNetwork}
+          />
+          <ThemedButton
+            variant="outline"
+            className="min-w-[100px] h-14 text-lg"
+            disabled
+          >
+            {fromToken}
+          </ThemedButton>
+        </div>
+      </div>
+
+      {/* Switch Button */}
+      <div className="flex justify-center my-3">
+        <ThemedButton
+          variant="ghost"
+          size="icon"
+          onClick={switchTokens}
+          className="rounded-full h-10 w-10"
+          disabled={!address || !isCorrectNetwork}
+        >
+          <ArrowDownUp className="w-5 h-5" />
+        </ThemedButton>
+      </div>
+
+      {/* To Token */}
+      <div className="space-y-2 mb-6">
+        <label className={cn(
+          "text-sm",
+          theme === 'cyberpunk' ? 'text-slate-400' : 'text-slate-600'
+        )}>
+          买入
+        </label>
+        <div className="flex gap-2">
+          <div className="relative flex-1">
             <Input
               type="number"
               placeholder="0.0"
-              value={amountIn}
-              onChange={(event) => setAmountIn(event.target.value)}
-              className="flex-1 bg-transparent text-2xl font-semibold text-white focus-visible:ring-blue-500"
-              min="0"
-              step="any"
-            />
-            <div className="rounded-full bg-slate-800 px-4 py-2 text-sm text-white">
-              {fromToken}
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center justify-center py-1 text-slate-500">
-          <ArrowLeftRight className="h-4 w-4" />
-        </div>
-
-        <div className="rounded-2xl border border-slate-800 bg-slate-950/30 p-4">
-          <div className="flex items-center justify-between text-xs text-slate-400">
-            <span>To (estimated)</span>
-            <span>Balance: {toBalanceDisplay}</span>
-          </div>
-          <div className="mt-3 flex items-center gap-3">
-            <Input
-              value={amountOut ? amountOut : "-"}
+              value={amountOut || ""}
               readOnly
-              className="flex-1 bg-transparent text-2xl font-semibold text-slate-200"
+              className={cn(
+                "text-lg h-14",
+                theme === 'cyberpunk'
+                  ? 'bg-slate-900 border-slate-700 text-white'
+                  : 'bg-slate-50 border-slate-300 text-slate-900'
+              )}
             />
-            <div className="rounded-full bg-slate-800 px-4 py-2 text-sm text-white">
-              {toToken}
-            </div>
+            {isFetchingQuote && (
+              <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                <Loader2 className={cn(
+                  "w-4 h-4 animate-spin",
+                  theme === 'cyberpunk' ? 'text-slate-400' : 'text-slate-500'
+                )} />
+              </div>
+            )}
           </div>
-        </div>
-
-        <div className="flex flex-col gap-1 text-xs text-slate-400">
-          <div className="flex items-center justify-between">
-            <span>Slippage</span>
-            <span>1%</span>
-          </div>
-          {fromToken === "USDC" && (
-            <div className="flex items-center justify-between">
-              <span>Allowance</span>
-              <span>
-                {allowance
-                  ? `${formatDisplayAmount(formatUnits(allowance, USDC_DECIMALS), "USDC")} USDC`
-                  : "-"}
-              </span>
-            </div>
-          )}
-          {quoteError && (
-            <div className="flex items-center gap-1 text-amber-400">
-              <Info className="h-3 w-3" />
-              {quoteError}
-            </div>
-          )}
-          {insufficientBalance && (
-            <div className="flex items-center gap-1 text-red-400">
-              <Info className="h-3 w-3" />
-              余额不足
-            </div>
-          )}
+          <ThemedButton
+            variant="outline"
+            className="min-w-[100px] h-14 text-lg"
+            disabled
+          >
+            {toToken}
+          </ThemedButton>
         </div>
       </div>
 
-      <Button
-        className="mt-5 w-full bg-blue-600 text-white hover:bg-blue-500"
+      {/* Error Messages */}
+      {quoteError && (
+        <Alert className={cn(
+          "mb-4",
+          theme === 'cyberpunk' 
+            ? 'bg-amber-900/20 border-amber-700' 
+            : 'bg-amber-50 border-amber-200'
+        )}>
+          <AlertCircle className={cn(
+            "h-4 w-4",
+            theme === 'cyberpunk' ? 'text-amber-500' : 'text-amber-600'
+          )} />
+          <AlertDescription className={cn(
+            "text-sm",
+            theme === 'cyberpunk' ? 'text-amber-200' : 'text-amber-800'
+          )}>
+            {quoteError}
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {insufficientBalance && (
+        <Alert className={cn(
+          "mb-4",
+          theme === 'cyberpunk' 
+            ? 'bg-red-900/20 border-red-700' 
+            : 'bg-red-50 border-red-200'
+        )}>
+          <AlertCircle className={cn(
+            "h-4 w-4",
+            theme === 'cyberpunk' ? 'text-red-500' : 'text-red-600'
+          )} />
+          <AlertDescription className={cn(
+            "text-sm",
+            theme === 'cyberpunk' ? 'text-red-200' : 'text-red-800'
+          )}>
+            余额不足
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Swap Button */}
+      <ThemedButton
         onClick={handlePrimaryAction}
         disabled={actionDisabled}
+        className="w-full h-12 font-semibold"
+        emphasis
       >
         {(isSwapping || isApproving) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
         {buttonLabel}
-      </Button>
-    </div>
+      </ThemedButton>
+
+      {/* Transaction Info */}
+      {amountIn && amountOut && isCorrectNetwork && exchangeRate && (
+        <div className={cn(
+          "mt-4 pt-4 space-y-2 text-sm",
+          theme === 'cyberpunk' 
+            ? 'border-t border-slate-700' 
+            : 'border-t border-slate-200'
+        )}>
+          <div className={cn(
+            "flex justify-between",
+            theme === 'cyberpunk' ? 'text-slate-400' : 'text-slate-600'
+          )}>
+            <span>汇率</span>
+            <span className={theme === 'cyberpunk' ? 'text-white' : 'text-slate-900'}>
+              1 {fromToken} ≈ {exchangeRate.toFixed(6)} {toToken}
+            </span>
+          </div>
+          <div className={cn(
+            "flex justify-between",
+            theme === 'cyberpunk' ? 'text-slate-400' : 'text-slate-600'
+          )}>
+            <span>预估 Gas</span>
+            <span className={theme === 'cyberpunk' ? 'text-white' : 'text-slate-900'}>~$0.05</span>
+          </div>
+          <div className={cn(
+            "flex justify-between",
+            theme === 'cyberpunk' ? 'text-slate-400' : 'text-slate-600'
+          )}>
+            <span>价格影响</span>
+            <span className={parseFloat(priceImpact) > 5 
+              ? (theme === 'cyberpunk' ? "text-red-400" : "text-red-600")
+              : (theme === 'cyberpunk' ? "text-white" : "text-slate-900")
+            }>
+              {priceImpact}%
+            </span>
+          </div>
+          <div className={cn(
+            "flex justify-between",
+            theme === 'cyberpunk' ? 'text-slate-400' : 'text-slate-600'
+          )}>
+            <span>滑点容差</span>
+            <span className={theme === 'cyberpunk' ? 'text-white' : 'text-slate-900'}>1%</span>
+          </div>
+          <div className={cn(
+            "flex justify-between",
+            theme === 'cyberpunk' ? 'text-slate-400' : 'text-slate-600'
+          )}>
+            <span>协议</span>
+            <span className={cn(
+              "flex items-center gap-1",
+              theme === 'cyberpunk' ? 'text-white' : 'text-slate-900'
+            )}>
+              Uniswap V2 (BaseSwap)
+              <ExternalLink className="w-3 h-3" />
+            </span>
+          </div>
+          <div className={cn(
+            "flex justify-between",
+            theme === 'cyberpunk' ? 'text-slate-400' : 'text-slate-600'
+          )}>
+            <span>网络</span>
+            <span className={theme === 'cyberpunk' ? 'text-white' : 'text-slate-900'}>Base</span>
+          </div>
+        </div>
+      )}
+    </ThemedCard>
   );
 }
 
@@ -418,12 +589,4 @@ function formatDisplayAmount(value: string, token: "ETH" | "USDC") {
   const [whole, fraction = ""] = value.split(".");
   const trimmedFraction = fraction.slice(0, decimals).replace(/0+$/, "");
   return trimmedFraction ? `${whole}.${trimmedFraction}` : whole;
-}
-
-function formatBalanceDisplay(value?: string, decimals: number = 4) {
-  if (!value) return "-";
-  const [whole, fraction = ""] = value.split(".");
-  if (!fraction) return whole;
-  const trimmed = fraction.slice(0, decimals).replace(/0+$/, "");
-  return trimmed ? `${whole}.${trimmed}` : whole;
 }

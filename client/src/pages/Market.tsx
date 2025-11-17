@@ -80,12 +80,11 @@ export default function Market() {
 
   return (
     <PageLayout>
+      {/* Header Section with Swap Card */}
       <Section>
-        <CompactSwapCard />
-      </Section>
-
-      {/* Header Section */}
-      <Section>
+        <div className="grid gap-6 lg:grid-cols-3">
+          {/* Header Content - Takes 2 columns */}
+          <div className="lg:col-span-2 lg:order-1">
         <div className="flex items-center justify-between mb-6">
           <div>
             <h1 className={cn(
@@ -159,6 +158,13 @@ export default function Market() {
               6.8%
             </div>
           </ThemedCard>
+        </div>
+          </div>
+          
+          {/* Swap Card - Takes 1 column */}
+          <div className="lg:col-span-1 lg:order-2">
+            <CompactSwapCard />
+          </div>
         </div>
       </Section>
 
