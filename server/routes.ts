@@ -116,7 +116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Early-Bird Registration
+  // Wallet Authentication
   app.get("/api/auth/wallet/nonce", async (req: any, res) => {
     const address = String(req.query.address || "").toLowerCase();
     if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
@@ -125,6 +125,62 @@ export async function registerRoutes(app: Express): Promise<Server> {
     const nonce = createWalletNonce(address);
     res.json({ address, nonce, message: `Sign this nonce to prove ownership: ${nonce}` });
   });
+
+  app.post("/api/auth/wallet/login", async (req: any, res) => {
+    try {
+      const { walletAddress, signature } = req.body;
+
+      if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+        return res.status(400).json({ message: "Invalid wallet address" });
+      }
+
+      if (!signature) {
+        return res.status(400).json({ message: "Signature is required" });
+      }
+
+      const { authenticateWallet } = await import("./auth/walletAuth");
+      const walletUser = await authenticateWallet(walletAddress, signature);
+
+      if (!walletUser) {
+        return res.status(401).json({ message: "Authentication failed. Invalid signature or expired nonce." });
+      }
+
+      // Create session using Passport
+      req.login(walletUser, (err: any) => {
+        if (err) {
+          console.error("[WalletAuth] Session creation failed:", err);
+          return res.status(500).json({ message: "Failed to create session" });
+        }
+
+        // Get user from database for response
+        storage.getUserByWallet(walletAddress.toLowerCase())
+          .then((user) => {
+            res.json({
+              user: user || {
+                id: walletUser.claims.sub,
+                walletAddress: walletUser.claims.wallet_address,
+              },
+              authenticated: true,
+            });
+          })
+          .catch((error) => {
+            console.error("[WalletAuth] Failed to fetch user:", error);
+            res.json({
+              user: {
+                id: walletUser.claims.sub,
+                walletAddress: walletUser.claims.wallet_address,
+              },
+              authenticated: true,
+            });
+          });
+      });
+    } catch (error: any) {
+      console.error("[WalletAuth] Login error:", error);
+      res.status(500).json({ message: error.message || "Internal server error" });
+    }
+  });
+
+  // Early-Bird Registration
 
   app.post("/api/early-bird/register", async (req: any, res) => {
     const schema = z.object({
