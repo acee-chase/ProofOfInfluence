@@ -3,7 +3,8 @@ import express, { type Express, type Request } from "express";
 import { createServer, type Server } from "http";
 import { ethers } from "ethers";
 import { storage } from "./storage";
-import { setupAuth, isAuthenticated } from "./replitAuth";
+import { setupAuth } from "./replitAuth";
+import { isAuthenticated } from "./auth";
 import { insertProfileSchema, insertLinkSchema } from "@shared/schema";
 import { stripe } from "./stripe";
 import { registerMarketRoutes } from "./routes/market";
@@ -116,15 +117,124 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Early-Bird Registration
+  // Wallet Authentication
   app.get("/api/auth/wallet/nonce", async (req: any, res) => {
     const address = String(req.query.address || "").toLowerCase();
     if (!/^0x[a-fA-F0-9]{40}$/.test(address)) {
       return res.status(400).json({ message: "Invalid address" });
     }
+    
     const nonce = createWalletNonce(address);
-    res.json({ address, nonce, message: `Sign this nonce to prove ownership: ${nonce}` });
+    
+    // SIWE-style message format
+    const domain = process.env.APP_DOMAIN || req.hostname || "proofofinfluence.com";
+    const message = [
+      "Login to ProofOfInfluence",
+      `Domain: ${domain}`,
+      `Wallet: ${address}`,
+      `Nonce: ${nonce}`,
+      `Time: ${new Date().toISOString()}`,
+    ].join("\n");
+    
+    res.json({ address, nonce, message });
   });
+
+  app.post("/api/auth/wallet/login", async (req: any, res) => {
+    try {
+      const { address, signature, message } = req.body as {
+        address?: string;
+        signature?: string;
+        message?: string;
+      };
+
+      if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+        return res.status(400).json({ message: "Invalid address" });
+      }
+
+      if (!signature) {
+        return res.status(400).json({ message: "Signature is required" });
+      }
+
+      if (!message) {
+        return res.status(400).json({ message: "Message is required" });
+      }
+
+      const normalized = address.toLowerCase();
+
+      // 1) Get and verify nonce
+      const expectedNonce = getWalletNonce(normalized);
+      if (!expectedNonce) {
+        return res.status(401).json({ message: "Nonce expired or not found. Please request a new nonce." });
+      }
+
+      // Check if message contains the expected nonce
+      if (!message.includes(expectedNonce)) {
+        return res.status(401).json({ message: "Nonce mismatch. Message does not contain expected nonce." });
+      }
+
+      // 2) Verify signature using the message provided by frontend
+      let recovered: string;
+      try {
+        recovered = ethers.utils.verifyMessage(message, signature).toLowerCase();
+      } catch (error) {
+        return res.status(401).json({ message: "Invalid signature format." });
+      }
+
+      if (recovered !== normalized) {
+        return res.status(401).json({ message: "Signature verification failed. Signature does not match address." });
+      }
+
+      // 3) Consume nonce to prevent replay attacks
+      if (!consumeWalletNonce(normalized, expectedNonce)) {
+        return res.status(401).json({ message: "Nonce already used. Please request a new nonce." });
+      }
+
+      // 4) Get or create user
+      let user = await storage.getUserByWallet(normalized);
+      if (!user) {
+        // Create new user with wallet address
+        const userId = `wallet_${normalized.slice(2, 10)}_${Date.now()}`;
+        // First create user with minimal data
+        user = await storage.upsertUser({
+          id: userId,
+        });
+        // Then update wallet address
+        user = await storage.updateUserWallet(userId, normalized);
+      } else {
+        // Update last login time (updateUserWallet also updates updatedAt)
+        user = await storage.updateUserWallet(user.id, normalized);
+      }
+
+      // 5) Set wallet user in session
+      const { setWalletAuthUser } = await import("./auth/walletAuth");
+      setWalletAuthUser(req, {
+        id: user.id,
+        walletAddress: normalized,
+        email: user.email,
+        role: user.role,
+      });
+
+      // 6) Explicitly save session to ensure it's written to store
+      await new Promise<void>((resolve, reject) => {
+        (req.session as any).save((err: any) => (err ? reject(err) : resolve()));
+      });
+
+      res.json({
+        user: {
+          id: user.id,
+          walletAddress: normalized,
+          email: user.email,
+          role: user.role,
+        },
+        authenticated: true,
+      });
+    } catch (error: any) {
+      console.error("[WalletAuth] Login error:", error);
+      res.status(500).json({ message: error.message || "Internal server error" });
+    }
+  });
+
+  // Early-Bird Registration
 
   app.post("/api/early-bird/register", async (req: any, res) => {
     const schema = z.object({
