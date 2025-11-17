@@ -6,6 +6,7 @@ import { useAccount, useBalance } from 'wagmi';
 import { base } from 'wagmi/chains';
 import { useToast } from "@/hooks/use-toast";
 import { USDC_ADDRESS } from "@/lib/baseConfig";
+import { ROUTES } from "@/routes";
 
 export default function CompactSwapCard() {
   const [isExpanded, setIsExpanded] = useState(false);
@@ -40,7 +41,7 @@ export default function CompactSwapCard() {
     }
 
     // 跳转到完整交易页面，并预填金额
-    window.location.href = `/app/market?buy=${amount}`;
+    window.location.href = `${ROUTES.APP_TRADE}?buy=${amount}`;
   };
 
   if (!isExpanded) {

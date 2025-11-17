@@ -134,12 +134,68 @@ The response format matches what the frontend expects:
 - `amount` is returned as wei string for direct use with contracts
 - `index` and `proof` are ready for MerkleAirdropDistributor.claim()
 
+## Merkle Proof Generation
+
+The API now uses `merkletreejs` library for production-ready Merkle tree implementation.
+
+### Merkle Tree Format
+
+The MerkleAirdropDistributor contract uses double-hashed leaves:
+```
+leaf = keccak256(keccak256(abi.encode(index, account, amount)))
+```
+
+### Batch Creation Process
+
+When using `POST /api/admin/airdrop/batch`:
+
+1. **Build Tree**: Creates MerkleTree from all recipients using `merkletreejs`
+2. **Generate Proofs**: Generates Merkle proof for each recipient
+3. **Store Data**: Saves index and proof array to database for each eligibility
+4. **Return Root**: Returns Merkle root for contract deployment
+
+Example:
+```typescript
+// Backend automatically:
+const { tree, root } = buildMerkleTreeFromEligibilities(recipients);
+const proofs = generateProofsForBatch(tree, recipients);
+
+// Stores in database:
+{
+  merkleIndex: 0,
+  merkleProof: ["0x...", "0x..."], // Full proof path
+  roundId: 0
+}
+```
+
+### Proof Format
+
+Each proof is an array of hex strings representing the Merkle proof path:
+```json
+{
+  "proof": [
+    "0x1234...",
+    "0x5678...",
+    "0x9abc..."
+  ]
+}
+```
+
+The proof is generated using `merkletreejs` which ensures compatibility with OpenZeppelin's `MerkleProof.verify()` used in the contract.
+
+### Verification
+
+The generated proofs are compatible with the contract's verification:
+```solidity
+bytes32 leaf = keccak256(bytes.concat(keccak256(abi.encode(index, account, amount))));
+bool valid = MerkleProof.verify(merkleProof, root, leaf);
+```
+
 ## Next Steps
 
 For production:
-1. Use `merkletreejs` library for proper Merkle proof generation
+1. ✅ Use `merkletreejs` library for proper Merkle proof generation (COMPLETED)
 2. Add authentication/authorization for admin endpoints
 3. Add rate limiting
 4. Add caching for eligibility checks
-5. Implement proper Merkle tree proof generation (currently simplified)
 

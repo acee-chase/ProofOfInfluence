@@ -12,6 +12,7 @@ import { useAuth } from "@/hooks/useAuth";
 import WalletConnectButton from "@/components/WalletConnectButton";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
+import { ROUTES } from "@/routes";
 
 interface HeaderProps {
   lang?: "zh" | "en";
@@ -26,36 +27,36 @@ export default function Header({ lang = "zh" }: HeaderProps) {
   // Main navigation items (simplified)
   const mainNavItems = lang === "zh" 
     ? [
-        { label: "首页", href: "/" },
-        { label: "现货交易", href: "/app/market", icon: ShoppingCart, highlight: true },
-        { label: "RWA市场", href: "/app", icon: Briefcase },
-        { label: "Immortality", href: "/immortality" },
+        { label: "首页", href: ROUTES.HOME },
+        { label: "现货交易", href: ROUTES.APP_TRADE, icon: ShoppingCart, highlight: true },
+        { label: "RWA市场", href: ROUTES.APP_RWA_MARKET, icon: Briefcase },
+        { label: "projectX", href: ROUTES.APP },
       ]
     : [
-        { label: "Home", href: "/" },
-        { label: "Spot Trading", href: "/app/market", icon: ShoppingCart, highlight: true },
-        { label: "RWA Market", href: "/app", icon: Briefcase },
-        { label: "Immortality", href: "/immortality" },
+        { label: "Home", href: ROUTES.HOME },
+        { label: "Spot Trading", href: ROUTES.APP_TRADE, icon: ShoppingCart, highlight: true },
+        { label: "RWA Market", href: ROUTES.APP_RWA_MARKET, icon: Briefcase },
+        { label: "projectX", href: ROUTES.APP },
       ];
 
   // Resources dropdown items
   const resourceItems = lang === "zh"
     ? [
-        { label: "解决方案", href: "/solutions" },
-        { label: "应用案例", href: "/use-cases" },
-        { label: "Token 文档", href: "/token" },
-        { label: "关于我们", href: "/about" },
-        { label: "TGE 启动", href: "/tge" },
-        { label: "早鸟空投", href: "/early-bird" },
+        { label: "解决方案", href: ROUTES.SOLUTIONS },
+        { label: "应用案例", href: ROUTES.USE_CASES },
+        { label: "Token 文档", href: ROUTES.TOKEN },
+        { label: "关于我们", href: ROUTES.ABOUT },
+        { label: "TGE 启动", href: ROUTES.TGE },
+        { label: "早鸟空投", href: ROUTES.EARLY_BIRD },
       ]
     : [
-        { label: "Solutions", href: "/solutions" },
-        { label: "Use Cases", href: "/use-cases" },
-        { label: "Token Docs", href: "/token" },
-        { label: "About Us", href: "/about" },
-        { label: "TGE Launch", href: "/tge" },
-        { label: "Early-Bird", href: "/early-bird" },
-        { label: "Company", href: "/company" },
+        { label: "Solutions", href: ROUTES.SOLUTIONS },
+        { label: "Use Cases", href: ROUTES.USE_CASES },
+        { label: "Token Docs", href: ROUTES.TOKEN },
+        { label: "About Us", href: ROUTES.ABOUT },
+        { label: "TGE Launch", href: ROUTES.TGE },
+        { label: "Early-Bird", href: ROUTES.EARLY_BIRD },
+        { label: "Company", href: ROUTES.ABOUT },
       ];
 
   const resourcesLabel = lang === "zh" ? "资源" : "Resources";
@@ -74,7 +75,7 @@ export default function Header({ lang = "zh" }: HeaderProps) {
     <header className={cn('sticky top-0 z-50', headerStyles)}>
       <div className="max-w-7xl mx-auto flex justify-between items-center p-4">
         {/* Logo */}
-        <Link href="/">
+        <Link href={ROUTES.HOME}>
           <div className={cn('cursor-pointer', logoStyles)}>
             ACEE Ventures
           </div>
@@ -142,7 +143,7 @@ export default function Header({ lang = "zh" }: HeaderProps) {
 
           {/* projectX / Login Link */}
           {isAuthenticated ? (
-            <Link href="/immortality">
+            <Link href={ROUTES.APP}>
               <Button
                 variant="default"
                 className="bg-white text-slate-900 hover:bg-slate-100"
@@ -151,7 +152,7 @@ export default function Header({ lang = "zh" }: HeaderProps) {
               </Button>
             </Link>
           ) : (
-            <Link href="/login">
+            <Link href={ROUTES.LOGIN}>
               <Button
                 variant="outline"
                 className="border-slate-700 hover:bg-slate-800"

@@ -87,10 +87,12 @@ export default function Market() {
               'text-2xl font-bold',
               theme === 'cyberpunk' ? 'font-orbitron text-cyan-100' : 'font-fredoka text-slate-900'
             )}>
-              Market
+              {theme === 'cyberpunk' ? '现货交易' : 'Spot Trade'}
             </h1>
             <p className="text-sm opacity-70 mt-1">
-              Discover and invest in liquidity pools
+              {theme === 'cyberpunk' 
+                ? '发现并投资流动性池' 
+                : 'Discover and invest in liquidity pools'}
             </p>
           </div>
 

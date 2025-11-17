@@ -31,6 +31,8 @@ import {
   userPersonalityProfiles,
   userMemories,
   agentkitActions,
+  badges,
+  eventSyncState,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -94,6 +96,10 @@ import {
   type InsertUserMemory,
   type AgentkitAction,
   type InsertAgentkitAction,
+  type Badge,
+  type InsertBadge,
+  type EventSyncState,
+  type InsertEventSyncState,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, or, lte } from "drizzle-orm";
@@ -1617,6 +1623,60 @@ export class DatabaseStorage implements IStorage {
     await db.update(userMemories).set({ userId: primaryUserId }).where(eq(userMemories.userId, secondaryUserId));
 
     await db.delete(users).where(eq(users.id, secondaryUserId));
+  }
+
+  // Badge operations
+  async createBadge(data: InsertBadge): Promise<Badge> {
+    const [badge] = await db.insert(badges).values(data).returning();
+    return badge;
+  }
+
+  async getBadgesByOwner(owner: string): Promise<Badge[]> {
+    return await db
+      .select()
+      .from(badges)
+      .where(eq(badges.owner, owner.toLowerCase()))
+      .orderBy(desc(badges.mintedAt));
+  }
+
+  async getBadgeByTokenId(tokenId: string): Promise<Badge | undefined> {
+    const [badge] = await db.select().from(badges).where(eq(badges.tokenId, tokenId));
+    return badge;
+  }
+
+  // Event sync state operations
+  async getOrCreateSyncState(contractName: string): Promise<EventSyncState> {
+    const [existing] = await db
+      .select()
+      .from(eventSyncState)
+      .where(eq(eventSyncState.contractName, contractName));
+
+    if (existing) {
+      return existing;
+    }
+
+    const [newState] = await db
+      .insert(eventSyncState)
+      .values({ contractName, lastBlockNumber: null })
+      .returning();
+    return newState;
+  }
+
+  async updateLastIndexedBlock(contractName: string, lastBlockNumber: string): Promise<EventSyncState> {
+    const [updated] = await db
+      .update(eventSyncState)
+      .set({ lastBlockNumber, updatedAt: new Date() })
+      .where(eq(eventSyncState.contractName, contractName))
+      .returning();
+    return updated;
+  }
+
+  async getLastIndexedBlock(contractName: string): Promise<string | null> {
+    const [state] = await db
+      .select()
+      .from(eventSyncState)
+      .where(eq(eventSyncState.contractName, contractName));
+    return state?.lastBlockNumber || null;
   }
 }
 

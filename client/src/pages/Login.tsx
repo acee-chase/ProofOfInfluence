@@ -6,6 +6,7 @@ import { ThemedCard, ThemedButton, ThemedInput } from "@/components/themed";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import WalletConnectButton from "@/components/WalletConnectButton";
+import { ROUTES } from "@/routes";
 import {
   Mail,
   Lock,
@@ -30,7 +31,7 @@ export default function Login() {
     // Simulate login
     setTimeout(() => {
       setLoading(false);
-      setLocation("/Immortality");
+      setLocation(ROUTES.APP_DASHBOARD);
     }, 1500);
   };
 
@@ -123,7 +124,7 @@ export default function Login() {
                 <div className="text-center text-xs opacity-70">
                   还没有账号？{" "}
                   <a
-                    href="/early-bird"
+                    href={ROUTES.EARLY_BIRD}
                     className={cn(
                       'font-semibold hover:underline',
                       theme === 'cyberpunk' ? 'text-cyan-400' : 'text-blue-600'

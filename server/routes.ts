@@ -777,16 +777,41 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const userId = req.user.claims.sub;
       const { walletAddress, signature } = req.body;
 
-      // TODO: Add signature verification for production
-      // For MVP: storing wallet address without full signature verification
-      // Future: Implement nonce-based challenge and verify signature server-side
-      // using ethers.js: verifyMessage(nonce, signature) === walletAddress
+      if (!walletAddress || !/^0x[a-fA-F0-9]{40}$/.test(walletAddress)) {
+        return res.status(400).json({ message: "Invalid wallet address" });
+      }
+
+      const wallet = walletAddress.toLowerCase();
+
+      // Verify signature if provided
+      if (signature) {
+        // Verify nonce
+        const nonce = getWalletNonce(wallet);
+        if (!nonce) {
+          return res.status(400).json({ message: "Nonce expired or not found. Please request a new nonce." });
+        }
+
+        const message = `Sign this nonce to prove ownership: ${nonce}`;
+        const recovered = ethers.utils.verifyMessage(message, signature);
+        
+        if (recovered.toLowerCase() !== wallet) {
+          return res.status(400).json({ message: "Invalid signature. Signature does not match wallet address." });
+        }
+
+        // Consume nonce to prevent replay attacks
+        if (!consumeWalletNonce(wallet, nonce)) {
+          return res.status(400).json({ message: "Nonce already used. Please request a new nonce." });
+        }
+      } else {
+        // If no signature provided, warn but allow (for backward compatibility during transition)
+        console.warn(`Wallet connection without signature for user ${userId}, wallet ${wallet}`);
+      }
       
-      const user = await storage.updateUserWallet(userId, walletAddress);
+      const user = await storage.updateUserWallet(userId, wallet);
       res.json(user);
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error connecting wallet:", error);
-      res.status(400).json({ message: "Failed to connect wallet" });
+      res.status(400).json({ message: error.message || "Failed to connect wallet" });
     }
   });
 
