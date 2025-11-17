@@ -134,6 +134,27 @@ The response format matches what the frontend expects:
 - `amount` is returned as wei string for direct use with contracts
 - `index` and `proof` are ready for MerkleAirdropDistributor.claim()
 
+## Claim Process
+
+**Important**: Airdrop claims are executed via **direct user-wallet contract calls** using Merkle proofs. The backend's role is limited to eligibility checking and proof generation via `GET /api/airdrop/check`. 
+
+The frontend `AirdropCard` component uses the `useAirdrop` hook to call the MerkleAirdropDistributor contract directly with the user's EOA (Externally Owned Account). This ensures:
+
+- Users have full control over their claim transactions
+- No backend intermediary is required for token transfers
+- Claims are executed on-chain with proper Merkle proof verification
+- The contract's `claimed` mapping prevents double-claiming
+
+**Backend Responsibilities:**
+- Eligibility checking: `GET /api/airdrop/check`
+- Proof generation: Admin endpoints for creating eligibility records
+- Read-only metadata: Any other read endpoints
+
+**Frontend Responsibilities:**
+- Fetch eligibility and proofs from backend
+- Call `MerkleAirdropDistributor.claim()` or `claimFromRound()` directly
+- Handle transaction signing and confirmation
+
 ## Merkle Proof Generation
 
 The API now uses `merkletreejs` library for production-ready Merkle tree implementation.

@@ -1150,18 +1150,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.get("/api/poi/me/tier", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      // TODO: Get actual POI balance from blockchain/wallet
-      // For MVP, return mock balance or from transactions
-      const mockPoiBalance = 0; // Replace with actual balance lookup
-      
-      const tier = await storage.getUserTier(mockPoiBalance);
-      res.json({ tier, poiBalance: mockPoiBalance });
-    } catch (error) {
-      console.error("Error fetching user tier:", error);
-      res.status(500).json({ message: "Failed to fetch user tier" });
-    }
+    // TODO: Implement real POI tier logic when POI-based perks/levels are defined.
+    // For now this endpoint is a placeholder and always returns tier "none".
+    // Frontend currently queries POI balance directly on-chain via usePoiToken hook.
+    
+    res.json({
+      tier: "none",
+      poiBalance: null,
+      rulesVersion: 0
+    });
   });
 
   // POI Fee Credit routes
@@ -1179,53 +1176,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/poi/fee-credits/burn-intent", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { burnTxHash } = req.body;
-
-      if (!burnTxHash) {
-        return res.status(400).json({ message: "burnTxHash is required" });
-      }
-
-      // Check if this transaction has already been processed
-      const existing = await storage.getBurnIntentByTxHash(burnTxHash);
-      if (existing) {
-        return res.status(400).json({ 
-          message: "This burn transaction has already been processed",
-          code: "POI_BURN_ALREADY_PROCESSED"
-        });
-      }
-
-      // TODO: Verify transaction on blockchain
-      // For MVP, using mock values
-      const mockPoiAmount = 1000; // POI burned
-      const mockSnapshotRate = 0.05; // $0.05 per POI
-      const creditedCents = Math.floor(mockPoiAmount * mockSnapshotRate * 100);
-
-      // Create burn intent record
-      const burnIntent = await storage.createBurnIntent({
-        userId,
-        burnTxHash,
-        poiAmount: mockPoiAmount,
-        creditedCents,
-        snapshotRate: mockSnapshotRate.toString(),
-        status: 'credited',
-      });
-
-      // Update user's fee credit balance
-      await storage.updateFeeCreditBalance(userId, creditedCents);
-
-      res.json({
-        creditedCents,
-        snapshotRate: mockSnapshotRate,
-        burnIntent,
-      });
-    } catch (error) {
-      console.error("Error processing burn intent:", error);
-      res.status(500).json({ message: "Failed to process burn intent" });
-    }
-  });
 
   // Checkout routes
   app.post("/api/checkout/quote", async (req, res) => {
@@ -1746,44 +1696,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  // Claim airdrop (authenticated)
-  app.post("/api/airdrop/claim", isAuthenticated, async (req: any, res) => {
-    try {
-      const userId = req.user.claims.sub;
-      const { walletAddress } = req.body;
-
-      if (!walletAddress) {
-        return res.status(400).json({ message: "Wallet address is required" });
-      }
-
-      // Verify eligibility first
-      const eligibility = await storage.checkAirdropEligibility(userId);
-      if (!eligibility.eligible) {
-        return res.status(403).json({ message: "Not eligible for airdrop" });
-      }
-
-      if (eligibility.claimed) {
-        return res.status(400).json({ message: "Airdrop already claimed" });
-      }
-
-      // Mark as claimed
-      const result = await storage.claimAirdrop(userId, walletAddress);
-      
-      // TODO: Trigger actual token distribution (via smart contract or manual process)
-      // For MVP, we just mark it as claimed in the database
-      
-      res.json({
-        message: "Airdrop claimed successfully",
-        amount: result.amount,
-        claimDate: result.claimDate,
-      });
-    } catch (error: any) {
-      console.error("Error claiming airdrop:", error);
-      res.status(500).json({ 
-        message: error.message || "Failed to claim airdrop" 
-      });
-    }
-  });
 
   const httpServer = createServer(app);
   return httpServer;

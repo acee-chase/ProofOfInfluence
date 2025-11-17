@@ -5,7 +5,9 @@
 
 import { ethers } from "ethers";
 import { storage } from "../storage";
-import { ACHIEVEMENT_BADGES_ADDRESS } from "../../shared/contracts/achievement_badges.json";
+import achievementBadgesConfig from "../../shared/contracts/achievement_badges.json";
+
+const ACHIEVEMENT_BADGES_ADDRESS = achievementBadgesConfig.address;
 
 // AchievementBadges BadgeMinted event ABI
 const BADGE_MINTED_ABI = [
@@ -29,7 +31,7 @@ export async function indexBadgeEvents(
     throw new Error("ACHIEVEMENT_BADGES_ADDRESS not configured");
   }
 
-  const contract = new ethers.Contract(ACHIEVEMENT_BADGES_ADDRESS, BADGE_MINTED_ABI, provider);
+  const contract = new ethers.Contract(ACHIEVEMENT_BADGES_ADDRESS as string, BADGE_MINTED_ABI, provider);
 
   // Get sync state
   const syncState = await storage.getOrCreateSyncState(CONTRACT_NAME);

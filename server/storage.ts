@@ -170,10 +170,6 @@ export interface IStorage {
   createFeeCredit(feeCredit: InsertPoiFeeCredit): Promise<PoiFeeCredit>;
   updateFeeCreditBalance(userId: string, amountCents: number): Promise<PoiFeeCredit>;
   
-  // POI Burn Intent operations
-  createBurnIntent(burnIntent: InsertPoiBurnIntent): Promise<PoiBurnIntent>;
-  getBurnIntentByTxHash(txHash: string): Promise<PoiBurnIntent | undefined>;
-  
   // POI Fee Credit Lock operations
   createFeeCreditLock(lock: InsertPoiFeeCreditLock): Promise<PoiFeeCreditLock>;
   getFeeCreditLock(orderId: string): Promise<PoiFeeCreditLock | undefined>;
@@ -613,23 +609,6 @@ export class DatabaseStorage implements IStorage {
       .where(eq(poiFeeCredits.userId, userId))
       .returning();
     return updated;
-  }
-
-  // POI Burn Intent operations
-  async createBurnIntent(burnIntent: InsertPoiBurnIntent): Promise<PoiBurnIntent> {
-    const [newBurnIntent] = await db
-      .insert(poiBurnIntents)
-      .values(burnIntent)
-      .returning();
-    return newBurnIntent;
-  }
-
-  async getBurnIntentByTxHash(txHash: string): Promise<PoiBurnIntent | undefined> {
-    const [burnIntent] = await db
-      .select()
-      .from(poiBurnIntents)
-      .where(eq(poiBurnIntents.burnTxHash, txHash));
-    return burnIntent;
   }
 
   // POI Fee Credit Lock operations
@@ -1469,31 +1448,6 @@ export class DatabaseStorage implements IStorage {
     };
   }
 
-  async claimAirdrop(userId: string, walletAddress: string): Promise<AirdropEligibility> {
-    const [updated] = await db
-      .update(airdropEligibility)
-      .set({
-        claimed: true,
-        claimDate: sql`NOW()`,
-        updatedAt: sql`NOW()`,
-      })
-      .where(
-        and(
-          or(
-            eq(airdropEligibility.userId, userId),
-            eq(airdropEligibility.walletAddress, walletAddress.toLowerCase())
-          ),
-          eq(airdropEligibility.claimed, false)
-        )
-      )
-      .returning();
-
-    if (!updated) {
-      throw new Error("Airdrop not found or already claimed");
-    }
-
-    return updated;
-  }
 
   async createAirdropEligibility(data: InsertAirdropEligibility): Promise<AirdropEligibility> {
     const [created] = await db
