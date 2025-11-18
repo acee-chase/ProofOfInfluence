@@ -13,6 +13,7 @@ import { registerMerchantRoutes } from "./routes/merchant";
 import { registerAirdropRoutes } from "./routes/airdrop";
 import { registerReferralContractRoutes } from "./routes/referral";
 import { registerBadgeRoutes } from "./routes/badge";
+import { registerAuthRoutes } from "./routes/auth";
 import { mintTestBadge } from "./agentkit";
 import { generateImmortalityReply } from "./chatbot/generateReply";
 import { z } from "zod";
@@ -60,8 +61,11 @@ declare global {
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
-  // Setup Replit Auth
+  // Setup Replit Auth (session, passport initialization)
   await setupAuth(app);
+
+  // Register unified OAuth routes
+  registerAuthRoutes(app);
 
   registerMarketRoutes(app);
   registerReservePoolRoutes(app);
@@ -157,13 +161,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/auth/wallet/login", async (req: any, res) => {
     try {
-      const { address, signature, message } = req.body as {
+      const { address, walletAddress, signature, message } = req.body as {
         address?: string;
+        walletAddress?: string;
         signature?: string;
         message?: string;
       };
 
-      if (!address || !/^0x[a-fA-F0-9]{40}$/.test(address)) {
+      // 支持两种字段名：address 或 walletAddress（前端发送的是 walletAddress）
+      const finalAddress = address || walletAddress;
+
+      if (!finalAddress || !/^0x[a-fA-F0-9]{40}$/.test(finalAddress)) {
         return res.status(400).json({ message: "Invalid address" });
       }
 
@@ -175,7 +183,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: "Message is required" });
       }
 
-      const normalized = address.toLowerCase();
+      const normalized = finalAddress.toLowerCase();
 
       // 1) Get and verify nonce
       const expectedNonce = getWalletNonce(normalized);
