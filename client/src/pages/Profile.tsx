@@ -34,6 +34,20 @@ export default function Profile() {
 
   const { data: identities, refetch: refetchIdentities } = useQuery<any>({
     queryKey: ["/api/auth/identities"],
+    queryFn: async () => {
+      const res = await fetch("/api/auth/identities", {
+        credentials: "include",
+      });
+      // Treat 400 as unauthenticated (no identities) instead of an error
+      if (res.status === 400 || res.status === 401) {
+        return [];
+      }
+      if (!res.ok) {
+        throw new Error(`${res.status}: ${res.statusText}`);
+      }
+      return await res.json();
+    },
+    retry: false, // Disable retry for this query
   });
 
   const [username, setUsername] = useState("");

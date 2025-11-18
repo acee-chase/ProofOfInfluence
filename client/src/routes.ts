@@ -33,6 +33,7 @@ export const ROUTES = {
   APP_TRADE: "/app/trade",
   APP_RWA_MARKET: "/app/rwa-market",
   APP_IMMORTALITY: "/app/immortality",
+  APP_DEV_CONTRACTS: "/app/dev-contracts",
   
   // Payment
   PAYMENT_SUCCESS: "/payment-success",
