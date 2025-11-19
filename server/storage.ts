@@ -33,6 +33,7 @@ import {
   agentkitActions,
   badges,
   eventSyncState,
+  testWallets,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -100,6 +101,8 @@ import {
   type InsertBadge,
   type EventSyncState,
   type InsertEventSyncState,
+  type TestWallet,
+  type InsertTestWallet,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, or, lte } from "drizzle-orm";
@@ -280,6 +283,14 @@ export interface IStorage {
   // Event sync state
   getEventSyncState(contractName: string): Promise<EventSyncState | undefined>;
   upsertEventSyncState(state: InsertEventSyncState): Promise<EventSyncState>;
+  
+  // Test wallet operations
+  createTestWallet(data: InsertTestWallet): Promise<TestWallet>;
+  getTestWallet(id: number): Promise<TestWallet | undefined>;
+  getTestWalletByAddress(address: string): Promise<TestWallet | undefined>;
+  getTestWalletsByScenario(scenario: string): Promise<TestWallet[]>;
+  updateTestWalletStatus(id: number, status: string): Promise<TestWallet>;
+  getAvailableTestWallets(scenario: string): Promise<TestWallet[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -1669,6 +1680,56 @@ export class DatabaseStorage implements IStorage {
       .from(eventSyncState)
       .where(eq(eventSyncState.contractName, contractName));
     return state?.lastBlockNumber || null;
+  }
+
+  // Test wallet operations
+  async createTestWallet(data: InsertTestWallet): Promise<TestWallet> {
+    const [wallet] = await db
+      .insert(testWallets)
+      .values({ ...data, createdAt: new Date(), updatedAt: new Date() })
+      .returning();
+    return wallet;
+  }
+
+  async getTestWallet(id: number): Promise<TestWallet | undefined> {
+    const [wallet] = await db.select().from(testWallets).where(eq(testWallets.id, id));
+    return wallet;
+  }
+
+  async getTestWalletByAddress(address: string): Promise<TestWallet | undefined> {
+    const [wallet] = await db
+      .select()
+      .from(testWallets)
+      .where(eq(testWallets.walletAddress, address.toLowerCase()));
+    return wallet;
+  }
+
+  async getTestWalletsByScenario(scenario: string): Promise<TestWallet[]> {
+    return await db
+      .select()
+      .from(testWallets)
+      .where(eq(testWallets.scenario, scenario))
+      .orderBy(desc(testWallets.createdAt));
+  }
+
+  async updateTestWalletStatus(id: number, status: string): Promise<TestWallet> {
+    const [wallet] = await db
+      .update(testWallets)
+      .set({ status, updatedAt: new Date(), lastUsedAt: new Date() })
+      .where(eq(testWallets.id, id))
+      .returning();
+    if (!wallet) {
+      throw new Error(`Test wallet with id ${id} not found`);
+    }
+    return wallet;
+  }
+
+  async getAvailableTestWallets(scenario: string): Promise<TestWallet[]> {
+    return await db
+      .select()
+      .from(testWallets)
+      .where(and(eq(testWallets.scenario, scenario), eq(testWallets.status, "idle")))
+      .orderBy(desc(testWallets.lastUsedAt));
   }
 }
 

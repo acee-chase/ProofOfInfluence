@@ -14,6 +14,7 @@ import { registerAirdropRoutes } from "./routes/airdrop";
 import { registerReferralContractRoutes } from "./routes/referral";
 import { registerBadgeRoutes } from "./routes/badge";
 import { registerAuthRoutes } from "./routes/auth";
+import { registerTestRoutes } from "./routes/test";
 import { mintTestBadge } from "./agentkit";
 import { generateImmortalityReply } from "./chatbot/generateReply";
 import { z } from "zod";
@@ -115,6 +116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerAirdropRoutes(app);
   registerReferralContractRoutes(app);
   registerBadgeRoutes(app);
+  registerTestRoutes(app);
 
   // Auth routes
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
@@ -543,7 +545,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/me/memories", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      // Support demoUserId query parameter or header (dev/staging only)
+      const demoUserId = req.query.demoUserId || req.headers["x-demo-user-id"];
+      const userId = (demoUserId && (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "staging"))
+        ? demoUserId
+        : req.user.claims.sub;
       const limit = Number(req.query.limit) || 20;
       const cappedLimit = Math.min(Math.max(limit, 1), 50);
       const memories = await storage.listUserMemories({ userId, limit: cappedLimit });
@@ -556,7 +562,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/me/memories", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      // Support demoUserId query parameter or header (dev/staging only)
+      const demoUserId = req.query.demoUserId || req.headers["x-demo-user-id"];
+      const userId = (demoUserId && (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "staging"))
+        ? demoUserId
+        : req.user.claims.sub;
       const validated = memorySchema.parse(req.body);
       const memory = await storage.createUserMemory({
         userId,
@@ -1257,7 +1267,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/immortality/balance", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      // Support demoUserId query parameter or header (dev/staging only)
+      const demoUserId = req.query.demoUserId || req.headers["x-demo-user-id"];
+      const userId = (demoUserId && (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "staging"))
+        ? demoUserId
+        : req.user.claims.sub;
       const balance = await storage.getUserBalance(userId);
       res.json({
         credits: balance?.immortalityCredits ?? 0,

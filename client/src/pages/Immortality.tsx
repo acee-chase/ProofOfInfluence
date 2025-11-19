@@ -12,6 +12,9 @@ import { useToast } from "@/hooks/use-toast";
 import { ImmortalityChat } from "@/components/ImmortalityChat";
 import { useMintBadge, useTgePurchase, useStakePoi, useUnstakePoi, useClaimReward } from "@/hooks/useContractAction";
 import { ROUTES } from "@/routes";
+import { useDemoUser } from "@/hooks/useDemoUser";
+import { isDevEnvironment } from "@/lib/env";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
 interface ImmortalityBalanceResponse {
   credits: number;
@@ -48,6 +51,7 @@ export default function Immortality() {
   const { theme } = useTheme();
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const { selectedDemoUserId, setDemoUserId, isUsingDemoUser } = useDemoUser();
   const [memoryText, setMemoryText] = useState("");
   const [emotion, setEmotion] = useState("");
 
@@ -65,19 +69,28 @@ export default function Immortality() {
   const [stakeAmount, setStakeAmount] = useState<string>("");
   const [unstakeAmount, setUnstakeAmount] = useState<string>("");
 
+  // Fetch demo users list (dev only)
+  const { data: demoUsers } = useQuery<Array<{ userId: string; walletAddress: string; label?: string; username?: string }>>({
+    queryKey: ["/api/test/demo-users"],
+    enabled: isDevEnvironment() && isAuthenticated,
+  });
+
   const { data: balance, isFetching } = useQuery<ImmortalityBalanceResponse>({
-    queryKey: ["/api/immortality/balance"],
+    queryKey: ["/api/immortality/balance", selectedDemoUserId || undefined],
     enabled: isAuthenticated,
   });
 
   const { data: memories, refetch: refetchMemories } = useQuery<UserMemory[]>({
-    queryKey: ["/api/me/memories"],
+    queryKey: ["/api/me/memories", selectedDemoUserId || undefined],
     enabled: isAuthenticated,
   });
 
   const memoryMutation = useMutation({
     mutationFn: async (payload: { text: string; emotion?: string }) => {
-      const res = await fetch("/api/me/memories", {
+      const url = selectedDemoUserId
+        ? `/api/me/memories?demoUserId=${encodeURIComponent(selectedDemoUserId)}`
+        : "/api/me/memories";
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -143,6 +156,42 @@ export default function Immortality() {
 
   return (
     <PageLayout>
+      {isDevEnvironment() && (
+        <Section className="pt-4 pb-2">
+          <ThemedCard className="p-4">
+            <div className="flex items-center gap-4">
+              <span className="text-sm font-medium">Demo User:</span>
+              <Select
+                value={selectedDemoUserId || "none"}
+                onValueChange={(value) => {
+                  if (value === "none") {
+                    setDemoUserId(null);
+                  } else {
+                    setDemoUserId(value);
+                  }
+                }}
+              >
+                <SelectTrigger className="w-[300px]">
+                  <SelectValue placeholder="Select demo user" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None (Use real user)</SelectItem>
+                  {demoUsers?.map((demoUser) => (
+                    <SelectItem key={demoUser.userId} value={demoUser.userId}>
+                      {demoUser.label || demoUser.username || demoUser.walletAddress.slice(0, 10) + "..."}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {isUsingDemoUser && (
+                <span className="text-xs text-muted-foreground">
+                  Using demo user: {selectedDemoUserId}
+                </span>
+              )}
+            </div>
+          </ThemedCard>
+        </Section>
+      )}
       <Section className="pt-12">
         <div className="grid gap-8 lg:grid-cols-[1.1fr,0.9fr]">
           <ThemedCard className="p-6 space-y-5">
@@ -168,7 +217,7 @@ export default function Immortality() {
                 )}
               >
                 <Activity className="w-3 h-3" />
-                Agent {user?.username ?? "Guest"}{" "}
+                Agent {isUsingDemoUser ? (demoUsers?.find(u => u.userId === selectedDemoUserId)?.label || selectedDemoUserId) : (user?.username ?? "Guest")}{" "}
               </button>
             </div>
             <p className="text-sm opacity-80">{heroSubtitle}</p>

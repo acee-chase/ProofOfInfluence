@@ -7,14 +7,51 @@ async function throwIfResNotOk(res: Response) {
   }
 }
 
+/**
+ * Get demo user ID from localStorage (if available)
+ */
+function getDemoUserId(): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem("demoUserId");
+}
+
+/**
+ * Add demoUserId to URL or headers
+ */
+function addDemoUserIdToRequest(url: string, headers: HeadersInit = {}): { url: string; headers: HeadersInit } {
+  const demoUserId = getDemoUserId();
+  if (!demoUserId) {
+    return { url, headers };
+  }
+
+  // Add as query parameter
+  try {
+    const urlObj = new URL(url, window.location.origin);
+    urlObj.searchParams.set("demoUserId", demoUserId);
+    url = urlObj.pathname + urlObj.search;
+  } catch (e) {
+    // If URL parsing fails, append as query param manually
+    const separator = url.includes("?") ? "&" : "?";
+    url = `${url}${separator}demoUserId=${encodeURIComponent(demoUserId)}`;
+  }
+  
+  // Also add as header
+  const headersObj = new Headers(headers);
+  headersObj.set("x-demo-user-id", demoUserId);
+
+  return { url, headers: headersObj };
+}
+
 export async function apiRequest(
   method: string,
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
-  const res = await fetch(url, {
+  const { url: finalUrl, headers: finalHeaders } = addDemoUserIdToRequest(url, data ? { "Content-Type": "application/json" } : {});
+  
+  const res = await fetch(finalUrl, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers: finalHeaders,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -29,8 +66,12 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    const url = queryKey.join("/") as string;
+    const { url: finalUrl, headers: finalHeaders } = addDemoUserIdToRequest(url);
+    
+    const res = await fetch(finalUrl, {
       credentials: "include",
+      headers: finalHeaders,
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
