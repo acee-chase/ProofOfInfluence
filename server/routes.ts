@@ -12,6 +12,7 @@ import { registerMerchantRoutes } from "./routes/merchant";
 import { registerAirdropRoutes } from "./routes/airdrop";
 import { registerReferralContractRoutes } from "./routes/referral";
 import { registerBadgeRoutes } from "./routes/badge";
+import { registerTestRoutes } from "./routes/test";
 import { mintTestBadge } from "./agentkit";
 import { generateImmortalityReply } from "./chatbot/generateReply";
 import { z } from "zod";
@@ -68,6 +69,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerAirdropRoutes(app);
   registerReferralContractRoutes(app);
   registerBadgeRoutes(app);
+  registerTestRoutes(app);
 
   // Auth routes
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
