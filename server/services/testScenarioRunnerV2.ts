@@ -2,6 +2,7 @@ import { storage } from "../storage";
 import { userVaultService } from "./userVaultService";
 import { agentPermissionService } from "./agentPermissionService";
 import { generateImmortalityReply } from "../chatbot/generateReply";
+import { ethers } from "ethers";
 import {
   createBaseSepoliaPublicClient,
   createWalletClientFromPrivateKey,
@@ -275,7 +276,7 @@ export class TestScenarioRunnerV2 {
           const publicClient = createBaseSepoliaPublicClient();
           const walletClient = createWalletClientFromPrivateKey(privateKey);
 
-          // Contract ABI (minimal for mintSelf)
+          // Contract ABI (includes errors for proper decoding)
           const abi = [
             {
               inputs: [],
@@ -290,6 +291,33 @@ export class TestScenarioRunnerV2 {
               outputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }],
               stateMutability: "nonpayable",
               type: "function",
+            },
+            // Error definitions for decoding
+            {
+              inputs: [{ internalType: "address", name: "account", type: "address" }],
+              name: "AlreadyMinted",
+              type: "error",
+            },
+            {
+              inputs: [
+                { internalType: "uint256", name: "required", type: "uint256" },
+                { internalType: "uint256", name: "provided", type: "uint256" },
+              ],
+              name: "InsufficientPayment",
+              type: "error",
+            },
+            {
+              inputs: [{ internalType: "uint256", name: "badgeType", type: "uint256" }],
+              name: "BadgeDisabled",
+              type: "error",
+            },
+            {
+              inputs: [
+                { internalType: "uint256", name: "badgeType", type: "uint256" },
+                { internalType: "address", name: "account", type: "address" },
+              ],
+              name: "BadgeAlreadyClaimed",
+              type: "error",
             },
           ] as const;
 
@@ -338,16 +366,71 @@ export class TestScenarioRunnerV2 {
         }
       }
 
-      // Step 6: Verify
-      // TODO: Read contract to verify badge ownership
+      // Step 6: Verify on-chain
+      let verifyOutput: any = { owner: vaultWallet.walletAddress };
+      if (this.BADGE_CONTRACT_ADDRESS && params.mint !== false) {
+        try {
+          const publicClient = createBaseSepoliaPublicClient();
+          
+          // ABI for reading contract state
+          const readAbi = [
+            {
+              inputs: [{ internalType: "address", name: "account", type: "address" }],
+              name: "hasMinted",
+              outputs: [{ internalType: "bool", name: "", type: "bool" }],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [{ internalType: "uint256", name: "tokenId", type: "uint256" }],
+              name: "ownerOf",
+              outputs: [{ internalType: "address", name: "", type: "address" }],
+              stateMutability: "view",
+              type: "function",
+            },
+            {
+              inputs: [{ internalType: "address", name: "account", type: "address" }],
+              name: "balanceOf",
+              outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
+              stateMutability: "view",
+              type: "function",
+            },
+          ];
+
+          const readContract = new ethers.Contract(
+            this.BADGE_CONTRACT_ADDRESS,
+            readAbi,
+            publicClient
+          );
+
+          // Check if wallet has minted
+          const hasMinted = await readContract.hasMinted(vaultWallet.walletAddress);
+          const balance = await readContract.balanceOf(vaultWallet.walletAddress);
+          const balanceBN = ethers.BigNumber.from(balance);
+
+          verifyOutput = {
+            owner: vaultWallet.walletAddress,
+            hasMinted,
+            balance: balanceBN.toString(),
+            verified: hasMinted && balanceBN.gt(0),
+          };
+        } catch (verifyErr: any) {
+          console.warn("[TestRunner] Verify step failed:", verifyErr);
+          verifyOutput.error = verifyErr.message;
+        }
+      }
+
       steps.push({
         name: "verify",
-        status: "success",
-        output: { owner: vaultWallet.walletAddress },
+        status: verifyOutput.error ? "failed" : "success",
+        output: verifyOutput,
       });
-      await this.recordStep(runId, "verify", "success", {
-        owner: vaultWallet.walletAddress,
-      });
+      await this.recordStep(
+        runId,
+        "verify",
+        verifyOutput.error ? "failed" : "success",
+        verifyOutput
+      );
 
       return {
         success: true,
