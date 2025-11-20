@@ -787,3 +787,40 @@ export const eventSyncState = pgTable("event_sync_state", {
 export const insertEventSyncStateSchema = createInsertSchema(eventSyncState);
 export type InsertEventSyncState = z.infer<typeof insertEventSyncStateSchema>;
 export type EventSyncState = typeof eventSyncState.$inferSelect;
+
+// Test wallets for automated scenario runner
+export const testWallets = pgTable(
+  "test_wallets",
+  {
+    id: serial("id").primaryKey(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull().unique(),
+    privateKey: text("private_key").notNull(), // encrypted
+    chainId: integer("chain_id").notNull(),
+    network: varchar("network", { length: 50 }).notNull(),
+    userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+    label: varchar("label", { length: 255 }),
+    scenario: varchar("scenario", { length: 100 }),
+    status: varchar("status", { length: 20 }).default("idle").notNull(), // idle/in_use/locked/disabled
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    lastUsedAt: timestamp("last_used_at"),
+  },
+  (table) => [
+    index("test_wallets_address_idx").on(table.walletAddress),
+    index("test_wallets_scenario_idx").on(table.scenario),
+    index("test_wallets_status_idx").on(table.status),
+    index("test_wallets_user_id_idx").on(table.userId),
+  ],
+);
+
+export const insertTestWalletSchema = createInsertSchema(testWallets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastUsedAt: true,
+});
+
+export type InsertTestWallet = z.infer<typeof insertTestWalletSchema>;
+export type TestWallet = typeof testWallets.$inferSelect;
+

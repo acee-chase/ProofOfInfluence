@@ -14,6 +14,7 @@ import { registerAirdropRoutes } from "./routes/airdrop";
 import { registerReferralContractRoutes } from "./routes/referral";
 import { registerBadgeRoutes } from "./routes/badge";
 import { registerAuthRoutes } from "./routes/auth";
+import { registerTestRoutes } from "./routes/test";
 import { mintTestBadge } from "./agentkit";
 import { generateImmortalityReply } from "./chatbot/generateReply";
 import { z } from "zod";
@@ -21,7 +22,7 @@ import { contractService } from "./services/contracts";
 import { createWalletNonce, getWalletNonce, consumeWalletNonce } from "./auth/walletNonce";
 import { approveSpender, getAllowance } from "./agentkit/erc20";
 import tgeContract from "@shared/contracts/poi_tge.json";
-import usdcContract from "@shared/contracts/poi_tge.json";
+// USDC contract address from environment variable (no artifact needed for approve/allowance)
 import { getSaleStatus } from "./agentkit/tge";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -115,6 +116,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   registerAirdropRoutes(app);
   registerReferralContractRoutes(app);
   registerBadgeRoutes(app);
+  registerTestRoutes(app);
 
   // Auth routes
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
@@ -543,7 +545,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/me/memories", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      // Support demoUserId query param or header (dev/staging only)
+      const demoUserId = req.query.demoUserId || req.headers["x-demo-user-id"];
+      let userId = req.user.claims.sub;
+
+      if (demoUserId && process.env.NODE_ENV !== "production") {
+        // Use demo user ID instead of session user ID
+        userId = demoUserId;
+      }
+
       const limit = Number(req.query.limit) || 20;
       const cappedLimit = Math.min(Math.max(limit, 1), 50);
       const memories = await storage.listUserMemories({ userId, limit: cappedLimit });
@@ -556,7 +566,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/me/memories", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      // Support demoUserId query param or header (dev/staging only)
+      const demoUserId = req.query.demoUserId || req.headers["x-demo-user-id"];
+      let userId = req.user.claims.sub;
+
+      if (demoUserId && process.env.NODE_ENV !== "production") {
+        // Use demo user ID instead of session user ID
+        userId = demoUserId;
+      }
+
       const validated = memorySchema.parse(req.body);
       const memory = await storage.createUserMemory({
         userId,
@@ -1257,7 +1275,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/immortality/balance", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      // Support demoUserId query param or header (dev/staging only)
+      const demoUserId = req.query.demoUserId || req.headers["x-demo-user-id"];
+      let userId = req.user.claims.sub;
+
+      if (demoUserId && process.env.NODE_ENV !== "production") {
+        // Use demo user ID instead of session user ID
+        userId = demoUserId;
+      }
+
       const balance = await storage.getUserBalance(userId);
       res.json({
         credits: balance?.immortalityCredits ?? 0,
@@ -1810,6 +1836,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error processing referral:", error);
       res.status(500).json({ message: "Failed to process referral" });
+    }
+  });
+
+  // Test Scenarios Routes
+  app.post("/api/test-scenarios/run", async (req: any, res) => {
+    try {
+      const { scenarioKey, demoUserId, params = {} } = req.body;
+
+      if (!scenarioKey) {
+        return res.status(400).json({ success: false, error: "scenarioKey is required" });
+      }
+
+      // Import testScenarioRunner dynamically to avoid circular dependencies
+      const { testScenarioRunner } = await import("./services/testScenarioRunner");
+
+      // If demoUserId is provided, we could use it to set context
+      // For now, test scenarios use their own wallet allocation
+      const result = await testScenarioRunner.runScenario(scenarioKey as any, params);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("[TestScenarios] Error running scenario:", error);
+      res.status(500).json({
+        success: false,
+        error: error?.message || "INTERNAL_ERROR",
+      });
     }
   });
 

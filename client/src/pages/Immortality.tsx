@@ -7,7 +7,8 @@ import { ThemedCard, ThemedButton, ThemedBadge } from "@/components/themed";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/hooks/useAuth";
-import { AlertCircle, Brain, Zap, Coins, Activity, ArrowRight, Shield, Award, Loader2 } from "lucide-react";
+import { useDemoUser } from "@/hooks/useDemoUser";
+import { AlertCircle, Brain, Zap, Coins, Activity, ArrowRight, Shield, Award, Loader2, Users } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { ImmortalityChat } from "@/components/ImmortalityChat";
 import { useMintBadge, useTgePurchase, useStakePoi, useUnstakePoi, useClaimReward } from "@/hooks/useContractAction";
@@ -48,6 +49,7 @@ export default function Immortality() {
   const { theme } = useTheme();
   const { user, isAuthenticated } = useAuth();
   const { toast } = useToast();
+  const demoUser = useDemoUser();
   const [memoryText, setMemoryText] = useState("");
   const [emotion, setEmotion] = useState("");
 
@@ -65,19 +67,31 @@ export default function Immortality() {
   const [stakeAmount, setStakeAmount] = useState<string>("");
   const [unstakeAmount, setUnstakeAmount] = useState<string>("");
 
+  // Include demo user ID in query key to trigger refetch when switching
+  const demoUserId = demoUser.selectedDemoUserId;
+  const balanceQueryKey = demoUserId 
+    ? ["/api/immortality/balance", { demoUserId }]
+    : ["/api/immortality/balance"];
+  const memoriesQueryKey = demoUserId
+    ? ["/api/me/memories", { demoUserId }]
+    : ["/api/me/memories"];
+
   const { data: balance, isFetching } = useQuery<ImmortalityBalanceResponse>({
-    queryKey: ["/api/immortality/balance"],
+    queryKey: balanceQueryKey,
     enabled: isAuthenticated,
   });
 
   const { data: memories, refetch: refetchMemories } = useQuery<UserMemory[]>({
-    queryKey: ["/api/me/memories"],
+    queryKey: memoriesQueryKey,
     enabled: isAuthenticated,
   });
 
   const memoryMutation = useMutation({
     mutationFn: async (payload: { text: string; emotion?: string }) => {
-      const res = await fetch("/api/me/memories", {
+      const url = demoUserId 
+        ? `/api/me/memories?demoUserId=${encodeURIComponent(demoUserId)}`
+        : "/api/me/memories";
+      const res = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -160,16 +174,47 @@ export default function Immortality() {
                   {heroTitle}
                 </h1>
               </div>
-              <button
-                type="button"
-                className={cn(
-                  "px-3 py-1 rounded-full text-xs flex items-center gap-1",
-                  theme === "cyberpunk" ? "bg-cyan-400/15 text-cyan-200" : "bg-blue-100 text-blue-600",
+              <div className="flex items-center gap-2">
+                {demoUser.isDev && demoUser.demoUsers.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <select
+                      className={cn(
+                        "px-3 py-1 rounded-full text-xs outline-none",
+                        theme === "cyberpunk"
+                          ? "bg-cyan-400/15 text-cyan-200 border border-cyan-500/40"
+                          : "bg-blue-100 text-blue-600 border border-blue-200",
+                      )}
+                      value={demoUser.selectedDemoUserId || ""}
+                      onChange={(e) => {
+                        if (e.target.value) {
+                          demoUser.setSelectedDemoUserId(e.target.value);
+                        } else {
+                          demoUser.clearDemoUser();
+                        }
+                      }}
+                    >
+                      <option value="">真实用户</option>
+                      {demoUser.demoUsers.map((du) => (
+                        <option key={du.userId || du.walletAddress} value={du.userId || du.walletAddress}>
+                          Demo: {du.username || du.label || du.walletAddress.slice(0, 6)}...{du.walletAddress.slice(-4)}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 )}
-              >
-                <Activity className="w-3 h-3" />
-                Agent {user?.username ?? "Guest"}{" "}
-              </button>
+                <button
+                  type="button"
+                  className={cn(
+                    "px-3 py-1 rounded-full text-xs flex items-center gap-1",
+                    theme === "cyberpunk" ? "bg-cyan-400/15 text-cyan-200" : "bg-blue-100 text-blue-600",
+                  )}
+                >
+                  <Activity className="w-3 h-3" />
+                  Agent {demoUser.isUsingDemoUser 
+                    ? (demoUser.selectedDemoUser?.username || demoUser.selectedDemoUser?.label || demoUser.selectedDemoUser?.walletAddress.slice(0, 6))
+                    : (user?.username ?? "Guest")}{" "}
+                </button>
+              </div>
             </div>
             <p className="text-sm opacity-80">{heroSubtitle}</p>
             <div className="grid gap-4 sm:grid-cols-3">

@@ -20,6 +20,7 @@ import RWAMarket from "@/pages/RWAMarket";
 import About from "@/pages/About";
 import NotFound from "@/pages/not-found";
 import DevContractsPlayground from "@/pages/app/DevContractsPlaygroundPage";
+import TestScenariosPage from "@/pages/TestScenariosPage";
 
 /**
  * Router configuration component
@@ -55,6 +56,7 @@ export function AppRouter() {
       <Route path={ROUTES.APP_RWA_MARKET} component={RWAMarket} />
       <Route path={ROUTES.APP_IMMORTALITY} component={Immortality} />
       <Route path={ROUTES.APP_DEV_CONTRACTS} component={DevContractsPlayground} />
+      <Route path={ROUTES.APP_TEST_SCENARIOS} component={TestScenariosPage} />
       <Route path={ROUTES.APP} component={Dashboard} />
       <Route path={ROUTES.PAYMENT_SUCCESS} component={PaymentSuccess} />
       

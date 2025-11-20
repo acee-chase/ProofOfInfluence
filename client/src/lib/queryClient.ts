@@ -12,9 +12,21 @@ export async function apiRequest(
   url: string,
   data?: unknown | undefined,
 ): Promise<Response> {
+  // Read demoUserId from localStorage if available
+  const demoUserId = typeof window !== "undefined" 
+    ? localStorage.getItem("demoUserId")
+    : null;
+
+  const headers: Record<string, string> = data ? { "Content-Type": "application/json" } : {};
+  
+  // Add demo user header if present (dev/staging only)
+  if (demoUserId && (import.meta.env.DEV || import.meta.env.MODE === "development")) {
+    headers["x-demo-user-id"] = demoUserId;
+  }
+
   const res = await fetch(url, {
     method,
-    headers: data ? { "Content-Type": "application/json" } : {},
+    headers,
     body: data ? JSON.stringify(data) : undefined,
     credentials: "include",
   });
@@ -29,8 +41,43 @@ export const getQueryFn: <T>(options: {
 }) => QueryFunction<T> =
   ({ on401: unauthorizedBehavior }) =>
   async ({ queryKey }) => {
-    const res = await fetch(queryKey.join("/") as string, {
+    // Handle queryKey that may contain objects (e.g., for demo user filtering)
+    const urlParts: string[] = [];
+    const queryParams: string[] = [];
+    
+    for (const part of queryKey) {
+      if (typeof part === "string") {
+        urlParts.push(part);
+      } else if (typeof part === "object" && part !== null) {
+        // Extract query parameters from object
+        for (const [key, value] of Object.entries(part)) {
+          if (value !== undefined && value !== null) {
+            queryParams.push(`${encodeURIComponent(key)}=${encodeURIComponent(String(value))}`);
+          }
+        }
+      }
+    }
+    
+    let url = urlParts.join("/");
+    if (queryParams.length > 0) {
+      url += `?${queryParams.join("&")}`;
+    }
+    
+    // Read demoUserId from localStorage if available
+    const demoUserId = typeof window !== "undefined" 
+      ? localStorage.getItem("demoUserId")
+      : null;
+
+    const headers: Record<string, string> = {};
+    
+    // Add demo user header if present (dev/staging only)
+    if (demoUserId && (import.meta.env.DEV || import.meta.env.MODE === "development")) {
+      headers["x-demo-user-id"] = demoUserId;
+    }
+    
+    const res = await fetch(url, {
       credentials: "include",
+      headers,
     });
 
     if (unauthorizedBehavior === "returnNull" && res.status === 401) {
