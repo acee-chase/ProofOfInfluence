@@ -34,6 +34,7 @@ export const ROUTES = {
   APP_RWA_MARKET: "/app/rwa-market",
   APP_IMMORTALITY: "/app/immortality",
   APP_DEV_CONTRACTS: "/app/dev-contracts",
+  APP_TEST_SCENARIOS: "/app/test-scenarios",
   
   // Payment
   PAYMENT_SUCCESS: "/payment-success",

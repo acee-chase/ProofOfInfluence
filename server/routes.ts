@@ -21,7 +21,7 @@ import { contractService } from "./services/contracts";
 import { createWalletNonce, getWalletNonce, consumeWalletNonce } from "./auth/walletNonce";
 import { approveSpender, getAllowance } from "./agentkit/erc20";
 import tgeContract from "@shared/contracts/poi_tge.json";
-import usdcContract from "@shared/contracts/poi_tge.json";
+// USDC contract address from environment variable (no artifact needed for approve/allowance)
 import { getSaleStatus } from "./agentkit/tge";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -1810,6 +1810,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error processing referral:", error);
       res.status(500).json({ message: "Failed to process referral" });
+    }
+  });
+
+  // Test Scenarios Routes
+  app.post("/api/test-scenarios/run", async (req: any, res) => {
+    try {
+      const { scenarioKey, demoUserId, params = {} } = req.body;
+
+      if (!scenarioKey) {
+        return res.status(400).json({ success: false, error: "scenarioKey is required" });
+      }
+
+      // Import testScenarioRunner dynamically to avoid circular dependencies
+      const { testScenarioRunner } = await import("./services/testScenarioRunner");
+
+      // If demoUserId is provided, we could use it to set context
+      // For now, test scenarios use their own wallet allocation
+      const result = await testScenarioRunner.runScenario(scenarioKey as any, params);
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("[TestScenarios] Error running scenario:", error);
+      res.status(500).json({
+        success: false,
+        error: error?.message || "INTERNAL_ERROR",
+      });
     }
   });
 
