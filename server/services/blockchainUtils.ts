@@ -29,19 +29,32 @@ interface SimulateWriteResult {
 function decodeContractError(error: any, abi: any[]): { name?: string; args?: any[]; raw: string } | null {
   const iface = new ethers.utils.Interface(abi);
   
-  // Try multiple error data locations
+  // 🔧 改进：尝试从多个嵌套层级提取错误数据
   const errorData = 
     error?.data || 
     error?.error?.data || 
+    error?.error?.error?.data ||
     error?.info?.error?.data ||
+    error?.cause?.data ||
+    error?.cause?.error?.data ||
     error?.transaction?.data ||
     error?.receipt?.data;
 
-  if (errorData && typeof errorData === 'string' && errorData.startsWith('0x')) {
+  // 🔧 改进：尝试从错误消息中提取 revert 数据
+  let revertData = errorData;
+  if (!revertData || typeof revertData !== 'string' || !revertData.startsWith('0x')) {
+    const errorMessage = String(error?.message || error?.reason || error || '');
+    // 尝试匹配 "execution reverted: 0x..." 或 "0x..." 模式
+    const hexMatch = errorMessage.match(/0x[a-fA-F0-9]{8,}/i);
+    if (hexMatch) {
+      revertData = hexMatch[0];
+    }
+  }
+
+  if (revertData && typeof revertData === 'string' && revertData.startsWith('0x')) {
     try {
       // Try to parse as custom error (ethers v5 approach)
-      // Extract error selector (first 4 bytes)
-      const selector = errorData.slice(0, 10); // 0x + 4 bytes
+      const selector = revertData.slice(0, 10); // 0x + 4 bytes
       
       // Try to find matching error in ABI
       const errorAbi = abi.filter(item => item.type === 'error');
@@ -49,16 +62,14 @@ function decodeContractError(error: any, abi: any[]): { name?: string; args?: an
         try {
           const errorSig = iface.getSighash(errorDef.name);
           if (errorSig === selector) {
-            // Try to decode with Interface.decodeErrorData
             try {
-              const decoded = iface.decodeErrorResult(errorDef, errorData);
+              const decoded = iface.decodeErrorResult(errorDef, revertData);
               return {
                 name: errorDef.name,
                 args: decoded,
                 raw: String(error),
               };
             } catch {
-              // If decode fails, at least return the error name
               return {
                 name: errorDef.name,
                 raw: String(error),
@@ -77,6 +88,17 @@ function decodeContractError(error: any, abi: any[]): { name?: string; args?: an
   // Fallback: extract reason from error message
   const reason = error?.reason || error?.error?.reason || error?.message;
   if (reason && reason !== 'execution reverted') {
+    // 🔧 改进：尝试从 "execution reverted: ErrorName(...)" 中提取错误名
+    if (reason.includes('execution reverted')) {
+      const revertMatch = reason.match(/execution reverted:\s*(\w+)(?:\(([^)]*)\))?/);
+      if (revertMatch) {
+        return {
+          name: revertMatch[1],
+          args: revertMatch[2] ? [revertMatch[2]] : undefined,
+          raw: String(error),
+        };
+      }
+    }
     return {
       name: reason,
       raw: String(error),
@@ -137,6 +159,31 @@ export async function simulateAndWriteContract(
           },
         };
       }
+      // �� 修复：即使解码失败，也返回错误信息
+      // "cannot estimate gas" 通常意味着交易会失败
+      const errorMessage = estimateError?.message || estimateError?.reason || String(estimateError);
+      if (errorMessage.includes('cannot estimate gas') || errorMessage.includes('execution reverted')) {
+        // 尝试从嵌套错误中提取原始 revert 原因
+        const nestedError = estimateError?.error || estimateError?.cause || estimateError?.transaction;
+        const nestedDecoded = nestedError ? decodeContractError(nestedError, abi) : null;
+        
+        return {
+          error: {
+            name: nestedDecoded?.name || 'ESTIMATE_GAS_FAILED',
+            args: nestedDecoded?.args,
+            raw: nestedDecoded?.raw || errorMessage,
+            // 添加原始错误信息以便调试
+            originalError: errorMessage,
+          },
+        };
+      }
+      // 其他错误也返回，不要继续执行
+      return {
+        error: {
+          name: 'ESTIMATE_GAS_FAILED',
+          raw: errorMessage,
+        },
+      };
     }
 
     // Step 3: Execute the transaction

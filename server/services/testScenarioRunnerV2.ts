@@ -319,6 +319,37 @@ export class TestScenarioRunnerV2 {
             },
           ] as const;
 
+          // 在 mint_badge 步骤前添加诊断
+          try {
+            // 检查合约状态
+            const badge = new ethers.Contract(
+              this.BADGE_CONTRACT_ADDRESS,
+              [
+                'function paused() view returns (bool)',
+                'function badgeTypes(uint256) view returns (bool enabled, bool transferable, string uri)',
+                'function hasMinted(address) view returns (bool)',
+              ],
+              walletClient
+            );
+            
+            const isPaused = await badge.paused();
+            const badgeType1 = await badge.badgeTypes(1);
+            const alreadyMinted = await badge.hasMinted(vaultWallet.walletAddress);
+            
+            if (isPaused) {
+              throw new Error('Contract is paused');
+            }
+            if (!badgeType1.enabled) {
+              throw new Error('Badge type 1 is not enabled');
+            }
+            if (alreadyMinted && mintMethod === 'mintSelf') {
+              throw new Error('Address has already minted');
+            }
+          } catch (diagnosticError: any) {
+            console.error('[MintBadge] Diagnostic check failed:', diagnosticError);
+            // 记录诊断信息但不阻止执行
+          }
+
           const mintResult = await simulateAndWriteContract({
             provider: publicClient,
             signer: walletClient,
