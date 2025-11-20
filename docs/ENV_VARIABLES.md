@@ -20,6 +20,23 @@ STRIPE_PUBLISHABLE_KEY=pk_test_xxx
 BASE_URL=https://your-app.onrender.com  # Render
 # 或 https://your-app.repl.co  # Replit
 APP_DOMAIN=proofofinfluence.onrender.com  # 用于钱包登录 message
+
+# OpenAI API (用于 Immortality Chat)
+OPENAI_API_KEY=sk-xxx
+OPENAI_MODEL=gpt-4o-mini  # 可选，默认 gpt-4o-mini
+
+# Immortality Badge Contract (V2)
+IMMORTALITY_BADGE_ADDRESS=0x...  # ImmortalityBadgeV2 合约地址
+# 或使用前端变量
+VITE_IMMORTALITY_BADGE_ADDRESS=0x...
+
+# RPC URL (用于区块链交互)
+RPC_URL=https://sepolia.base.org  # Base Sepolia 默认
+BASE_RPC_URL=https://sepolia.base.org  # 或使用此变量
+CHAIN_ID=84532  # Base Sepolia chain ID
+
+# Platform Minter (可选，用于 mintFor 功能)
+PLATFORM_MINTER_PK=0x...  # 平台 Owner 私钥（仅用于 mintFor）
 ```
 
 ## Web3 部署配置 (新增)
