@@ -20,7 +20,8 @@
     "deploy:tge": "cross-env TS_NODE_PROJECT=tsconfig.hardhat.json hardhat run scripts/deploy-tge-sale-run.cjs --network base-sepolia --config hardhat.config.cts",
     "deploy:referral": "cross-env TS_NODE_PROJECT=tsconfig.hardhat.json hardhat run scripts/deploy-referral-run.cjs --network base-sepolia --config hardhat.config.cts",
     "deploy:badges": "cross-env TS_NODE_PROJECT=tsconfig.hardhat.json hardhat run scripts/deploy-badges-run.cjs --network base-sepolia --config hardhat.config.cts",
-    "deploy:immortality": "cross-env TS_NODE_PROJECT=tsconfig.hardhat.json hardhat run scripts/deploy-immortality-badge-run.cjs --network base-sepolia --config hardhat.config.cts"
+    "deploy:immortality": "cross-env TS_NODE_PROJECT=tsconfig.hardhat.json hardhat run scripts/deploy-immortality-badge-run.cjs --network base-sepolia --config hardhat.config.cts",
+    "deploy:immortality-v2": "cross-env TS_NODE_PROJECT=tsconfig.hardhat.json hardhat run scripts/deploy-immortality-badge-v2-run.cjs --network base-sepolia --config hardhat.config.cts"
   },
   "dependencies": {
     "@coinbase/agentkit": "^0.2.3",

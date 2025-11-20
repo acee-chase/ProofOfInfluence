@@ -1842,26 +1842,79 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Test Scenarios Routes
   app.post("/api/test-scenarios/run", async (req: any, res) => {
     try {
-      const { scenarioKey, demoUserId, params = {} } = req.body;
+      // Read demoUserId from header or body
+      const demoUserId =
+        req.headers["x-demo-user-id"] || req.body.demoUserId || `demo-${Date.now()}`;
+
+      const { scenarioKey, params = {} } = req.body;
 
       if (!scenarioKey) {
-        return res.status(400).json({ success: false, error: "scenarioKey is required" });
+        return res.status(400).json({
+          success: false,
+          error: { code: "INVALID_REQUEST", message: "scenarioKey is required" },
+        });
       }
 
-      // Import testScenarioRunner dynamically to avoid circular dependencies
-      const { testScenarioRunner } = await import("./services/testScenarioRunner");
+      // Import testScenarioRunnerV2 dynamically
+      const { testScenarioRunnerV2 } = await import("./services/testScenarioRunnerV2");
 
-      // If demoUserId is provided, we could use it to set context
-      // For now, test scenarios use their own wallet allocation
-      const result = await testScenarioRunner.runScenario(scenarioKey as any, params);
+      const result = await testScenarioRunnerV2.runScenario(
+        scenarioKey as any,
+        demoUserId,
+        params
+      );
 
       res.json(result);
     } catch (error: any) {
       console.error("[TestScenarios] Error running scenario:", error);
       res.status(500).json({
         success: false,
-        error: error?.message || "INTERNAL_ERROR",
+        error: {
+          code: "INTERNAL_ERROR",
+          message: error?.message || "Internal server error",
+        },
       });
+    }
+  });
+
+  // Get test run details
+  app.get("/api/test-runs/:runId", async (req: any, res) => {
+    try {
+      const { runId } = req.params;
+      const run = await storage.getTestRun(runId);
+      if (!run) {
+        return res.status(404).json({ message: "Test run not found" });
+      }
+
+      const steps = await storage.getTestSteps(runId);
+
+      res.json({
+        ...run,
+        steps,
+      });
+    } catch (error: any) {
+      console.error("[TestRuns] Error fetching run:", error);
+      res.status(500).json({ message: "Failed to fetch test run" });
+    }
+  });
+
+  // Vault Agent Permissions
+  app.post("/api/vaults/:vaultId/agents/grant", async (req: any, res) => {
+    try {
+      const { vaultId } = req.params;
+      const { agentId, scopes, constraints } = req.body;
+
+      if (!agentId || !scopes || !Array.isArray(scopes)) {
+        return res.status(400).json({ message: "agentId and scopes array are required" });
+      }
+
+      const { agentPermissionService } = await import("./services/agentPermissionService");
+      const permission = await agentPermissionService.grant(vaultId, agentId, scopes, constraints);
+
+      res.json({ success: true, permissionId: permission.id });
+    } catch (error: any) {
+      console.error("[VaultPermissions] Error granting permission:", error);
+      res.status(500).json({ message: "Failed to grant permission" });
     }
   });
 

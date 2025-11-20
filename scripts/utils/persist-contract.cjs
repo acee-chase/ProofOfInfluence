@@ -16,6 +16,7 @@ const OUTPUT_FILES = {
   ReferralRegistry: "referral_registry.json",
   AchievementBadges: "achievement_badges.json",
   ImmortalityBadge: "immortality_badge.json",
+  ImmortalityBadgeV2: "immortality_badge_v2.json",
 };
 
 /**

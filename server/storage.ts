@@ -34,6 +34,8 @@ import {
   badges,
   eventSyncState,
   testWallets,
+  testRuns,
+  testSteps,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -103,6 +105,18 @@ import {
   type InsertEventSyncState,
   type TestWallet,
   type InsertTestWallet,
+  type UserVault,
+  type InsertUserVault,
+  type VaultWallet,
+  type InsertVaultWallet,
+  type Agent,
+  type InsertAgent,
+  type VaultAgentPermission,
+  type InsertVaultAgentPermission,
+  type TestRun,
+  type InsertTestRun,
+  type TestStep,
+  type InsertTestStep,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, or, lte } from "drizzle-orm";
@@ -1746,6 +1760,45 @@ export class DatabaseStorage implements IStorage {
         )
       )
       .orderBy(desc(testWallets.lastUsedAt));
+  }
+
+  // Test Runs & Steps
+  async createTestRun(run: InsertTestRun): Promise<TestRun> {
+    const [created] = await db.insert(testRuns).values(run).returning();
+    return created;
+  }
+
+  async updateTestRun(runId: string, updates: Partial<InsertTestRun>): Promise<TestRun> {
+    const [updated] = await db
+      .update(testRuns)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(testRuns.id, runId))
+      .returning();
+    if (!updated) {
+      throw new Error(`Test run with id ${runId} not found`);
+    }
+    return updated;
+  }
+
+  async getTestRun(runId: string): Promise<TestRun | undefined> {
+    const [run] = await db.select().from(testRuns).where(eq(testRuns.id, runId)).limit(1);
+    return run;
+  }
+
+  async createTestStep(step: InsertTestStep): Promise<TestStep> {
+    const [created] = await db.insert(testSteps).values(step).returning();
+    return created;
+  }
+
+  async getTestSteps(runId: string): Promise<TestStep[]> {
+    return await db
+      .select()
+      .from(testSteps)
+      .where(eq(testSteps.runId, runId))
+      .orderBy(testSteps.createdAt);
   }
 }
 
