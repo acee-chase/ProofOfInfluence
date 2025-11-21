@@ -3,7 +3,7 @@ import express, { type Express, type Request } from "express";
 import { createServer, type Server } from "http";
 import { ethers } from "ethers";
 import { storage } from "./storage";
-import { setupAuth } from "./replitAuth";
+import { setupAuth } from "./auth/session";
 import { isAuthenticated } from "./auth";
 import { insertProfileSchema, insertLinkSchema } from "@shared/schema";
 import { stripe } from "./stripe";
@@ -14,6 +14,9 @@ import { registerAirdropRoutes } from "./routes/airdrop";
 import { registerReferralContractRoutes } from "./routes/referral";
 import { registerBadgeRoutes } from "./routes/badge";
 import { registerAuthRoutes } from "./routes/auth";
+import { registerTestRoutes } from "./routes/test";
+import { registerImmortalityRoutes } from "./routes/immortality";
+import { registerAgentKitRoutes } from "./routes/agentkit";
 import { mintTestBadge } from "./agentkit";
 import { generateImmortalityReply } from "./chatbot/generateReply";
 import { z } from "zod";
@@ -21,7 +24,7 @@ import { contractService } from "./services/contracts";
 import { createWalletNonce, getWalletNonce, consumeWalletNonce } from "./auth/walletNonce";
 import { approveSpender, getAllowance } from "./agentkit/erc20";
 import tgeContract from "@shared/contracts/poi_tge.json";
-import usdcContract from "@shared/contracts/poi_tge.json";
+// USDC contract address from environment variable (no artifact needed for approve/allowance)
 import { getSaleStatus } from "./agentkit/tge";
 
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
@@ -67,12 +70,58 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Register unified OAuth routes
   registerAuthRoutes(app);
 
+  // Unified logout endpoint (supports Replit Auth and Wallet Auth)
+  app.post("/api/auth/logout", async (req: any, res) => {
+    try {
+      // 1) 清钱包 session（如果有）
+      try {
+        if (req.session && req.session.walletUser) {
+          delete req.session.walletUser;
+        }
+      } catch (e) {
+        console.warn("[Auth] clear walletUser failed:", e);
+      }
+
+      // 2) 清 Passport / Replit 登录（如果有）
+      await new Promise<void>((resolve, reject) => {
+        if (typeof req.logout === "function") {
+          req.logout((err: any) => (err ? reject(err) : resolve()));
+        } else {
+          resolve();
+        }
+      });
+
+      // 3) 销毁整个 session
+      await new Promise<void>((resolve) => {
+        if (req.session) {
+          req.session.destroy(() => resolve());
+        } else {
+          resolve();
+        }
+      });
+
+      // 4) 清 cookie（名字按 session 配置，默认 connect.sid）
+      res.clearCookie("connect.sid");
+
+      return res.json({ ok: true });
+    } catch (err) {
+      console.error("[Auth] Logout error:", err);
+      return res
+        .status(500)
+        .json({ message: "Logout failed", detail: (err as any)?.message });
+    }
+  });
+
+  // Register route modules
   registerMarketRoutes(app);
   registerReservePoolRoutes(app);
   registerMerchantRoutes(app);
   registerAirdropRoutes(app);
   registerReferralContractRoutes(app);
   registerBadgeRoutes(app);
+  registerTestRoutes(app);
+  registerImmortalityRoutes(app);
+  registerAgentKitRoutes(app);
 
   // Auth routes
   app.get("/api/auth/user", isAuthenticated, async (req: any, res) => {
@@ -128,6 +177,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         id: user.id,
         email: user.email,
         role: user.role,
+        plan: user.plan || "free", // 添加 plan 字段
         walletAddress: req.user.walletAddress || user.walletAddress || null,
         // TODO: 其他 profile 字段可以后续补
       });
@@ -144,6 +194,12 @@ export async function registerRoutes(app: Express): Promise<Server> {
       return res.status(400).json({ message: "Invalid address" });
     }
     
+    console.log("[WalletAuth] Nonce request:", { 
+      address, 
+      sessionId: req.sessionID,
+      hasSession: !!req.session 
+    });
+    
     const nonce = createWalletNonce(address);
     
     // SIWE-style message format
@@ -156,11 +212,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
       `Time: ${new Date().toISOString()}`,
     ].join("\n");
     
+    console.log("[WalletAuth] Nonce created:", { address, nonce });
+    
     res.json({ address, nonce, message });
   });
 
   app.post("/api/auth/wallet/login", async (req: any, res) => {
     try {
+      console.log("[WalletAuth] Login request received:", {
+        sessionId: req.sessionID,
+        hasSession: !!req.session,
+        bodyKeys: Object.keys(req.body || {}),
+      });
+
       const { address, walletAddress, signature, message } = req.body as {
         address?: string;
         walletAddress?: string;
@@ -170,6 +234,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 支持两种字段名：address 或 walletAddress（前端发送的是 walletAddress）
       const finalAddress = address || walletAddress;
+      
+      console.log("[WalletAuth] Login attempt for address:", finalAddress);
 
       if (!finalAddress || !/^0x[a-fA-F0-9]{40}$/.test(finalAddress)) {
         return res.status(400).json({ message: "Invalid address" });
@@ -215,9 +281,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       // 4) Find or create user in database
       // This ensures DB always has the user before session is set
+      console.log("[WalletAuth] Finding or creating user for wallet:", normalized);
       const user = await storage.findOrCreateUserByWallet(normalized);
+      console.log("[WalletAuth] User found/created:", { id: user.id, walletAddress: user.walletAddress, role: user.role });
 
-      // 5) Set wallet user in session
+      // 5) Ensure session exists
+      if (!req.session) {
+        console.error("[WalletAuth] Session not available!");
+        return res.status(500).json({ message: "Session not available" });
+      }
+
+      // 6) Set wallet user in session
       const { setWalletAuthUser } = await import("./auth/walletAuth");
       setWalletAuthUser(req, {
         id: user.id,
@@ -225,11 +299,29 @@ export async function registerRoutes(app: Express): Promise<Server> {
         email: user.email,
         role: user.role,
       });
-
-      // 6) Explicitly save session to ensure it's written to store
-      await new Promise<void>((resolve, reject) => {
-        (req.session as any).save((err: any) => (err ? reject(err) : resolve()));
+      console.log("[WalletAuth] Wallet user set in session:", { 
+        sessionId: req.sessionID, 
+        hasWalletUser: !!(req.session as any).walletUser 
       });
+
+      // 7) Explicitly save session to ensure it's written to store
+      await new Promise<void>((resolve, reject) => {
+        (req.session as any).save((err: any) => {
+          if (err) {
+            console.error("[WalletAuth] Session save error:", err);
+            reject(err);
+          } else {
+            console.log("[WalletAuth] Session saved successfully, sessionId:", req.sessionID);
+            resolve();
+          }
+        });
+      });
+
+      // 8) Verify session was saved (optional check)
+      const savedSession = (req.session as any).walletUser;
+      if (!savedSession) {
+        console.error("[WalletAuth] Warning: walletUser not found in session after save!");
+      }
 
       // Return user directly (not wrapped in { user, authenticated })
       res.json({
@@ -501,7 +593,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/me/memories", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      // Support demoUserId query param or header (dev/staging only)
+      const demoUserId = req.query.demoUserId || req.headers["x-demo-user-id"];
+      let userId = req.user.claims.sub;
+
+      if (demoUserId && process.env.NODE_ENV !== "production") {
+        // Use demo user ID instead of session user ID
+        userId = demoUserId;
+      }
+
       const limit = Number(req.query.limit) || 20;
       const cappedLimit = Math.min(Math.max(limit, 1), 50);
       const memories = await storage.listUserMemories({ userId, limit: cappedLimit });
@@ -514,7 +614,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/me/memories", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      // Support demoUserId query param or header (dev/staging only)
+      const demoUserId = req.query.demoUserId || req.headers["x-demo-user-id"];
+      let userId = req.user.claims.sub;
+
+      if (demoUserId && process.env.NODE_ENV !== "production") {
+        // Use demo user ID instead of session user ID
+        userId = demoUserId;
+      }
+
       const validated = memorySchema.parse(req.body);
       const memory = await storage.createUserMemory({
         userId,
@@ -530,6 +638,113 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Helper function to build Immortality actions from user message and context
+  type ImmortalityActionType = "activate_agent" | "upload_memory" | "mint_badge" | "pay_poi";
+
+  interface ActionMessage {
+    type: "action";
+    actionType: ImmortalityActionType;
+    autoExecute: boolean;
+    content: string;
+    suggestedAmount?: number; // For pay_poi action
+  }
+
+  function buildImmortalityActions(params: {
+    message: string;
+    suggestedActions: Array<{ type: string; title: string; description?: string }>;
+    memories: Array<{ id: number; text: string; createdAt: string }>;
+    currentBalance?: number; // Add balance parameter
+  }): ActionMessage[] {
+    const { message, suggestedActions, memories, currentBalance } = params;
+    const actions: ActionMessage[] = [];
+
+    const lower = (message || "").toLowerCase();
+    const hasMemories = memories.length > 0;
+
+    // Check for activation keywords
+    const wantActivate =
+      lower.includes("激活") ||
+      lower.includes("开通") ||
+      lower.includes("agent") ||
+      lower.includes("启动");
+
+    // Check for memory keywords
+    const wantMemory =
+      lower.includes("记忆") ||
+      lower.includes("回忆") ||
+      lower.includes("记录") ||
+      lower.includes("记住") ||
+      lower.includes("保存");
+
+    // Check for badge/mint keywords
+    const wantMint =
+      lower.includes("徽章") ||
+      lower.includes("badge") ||
+      lower.includes("上链") ||
+      lower.includes("永生") ||
+      lower.includes("铸造") ||
+      lower.includes("mint");
+
+    // 1) Activate Agent (suggestion mode)
+    if (wantActivate) {
+      actions.push({
+        type: "action",
+        actionType: "activate_agent",
+        autoExecute: false,
+        content: "激活你的 Immortality Agent",
+      });
+    }
+
+    // 2) Upload Memory (auto-execute mode)
+    if (wantMemory) {
+      actions.push({
+        type: "action",
+        actionType: "upload_memory",
+        autoExecute: true,
+        content: message, // Use user's message as memory content
+      });
+    }
+
+    // 3) Mint Badge (suggestion mode): requires at least one memory
+    if (hasMemories && wantMint) {
+      actions.push({
+        type: "action",
+        actionType: "mint_badge",
+        autoExecute: false,
+        content: "为你铸造一枚 Immortality 徽章",
+      });
+    }
+
+    // 4) Map suggestedActions to mint_badge if MINT_TEST_BADGE is present
+    if (
+      suggestedActions?.some((a) => a.type === "MINT_TEST_BADGE") &&
+      !actions.some((a) => a.actionType === "mint_badge")
+    ) {
+      // Only add if user has memories (basic requirement)
+      if (hasMemories) {
+        actions.push({
+          type: "action",
+          actionType: "mint_badge",
+          autoExecute: false,
+          content: "根据你的对话，我可以帮你铸造一枚测试徽章。",
+        });
+      }
+    }
+
+    // 5) Suggest pay_poi if balance is low (optional enhancement)
+    if (currentBalance !== undefined && currentBalance < 5) {
+      actions.push({
+        type: "action",
+        actionType: "pay_poi",
+        autoExecute: false,
+        content: "余额较低，建议充值",
+        suggestedAmount: 20,
+      });
+    }
+    
+    return actions;
+  }
+
   app.post("/api/chat", isAuthenticated, async (req: any, res) => {
     const openAiKey = process.env.OPENAI_API_KEY;
     if (!openAiKey) {
@@ -544,12 +759,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
 
     const userId = req.user.claims.sub;
+    const CREDITS_PER_MESSAGE = 1; // Cost per chat message
+    
     try {
+      // 1. Get current balance
+      const balance = await storage.getUserBalance(userId);
+      const currentBalance = balance?.immortalityCredits ?? 0;
+      
+      // 2. Check if balance is sufficient
+      if (currentBalance < CREDITS_PER_MESSAGE) {
+        const actions = [{
+          type: "action" as const,
+          actionType: "pay_poi" as const,
+          autoExecute: false,
+          content: "余额不足，请充值以继续使用",
+          suggestedAmount: 20,
+        }];
+        
+        return res.json({
+          reply: "你的余额不足，无法处理此消息。请先充值 Immortality Credits。",
+          profileUsed: false,
+          memoryCount: 0,
+          actions,
+          creditsCharged: 0,
+          newBalance: currentBalance,
+        });
+      }
+
+      // 3. Get profile and memories
       const [profile, memories] = await Promise.all([
         storage.getUserPersonalityProfile(userId),
         storage.listUserMemories({ userId, limit: 10 }),
       ]);
 
+      // 4. Generate reply
       const { reply, suggestedActions } = await generateImmortalityReply({
         message: body.message,
         profile,
@@ -558,11 +801,40 @@ export async function registerRoutes(app: Express): Promise<Server> {
         modelName: process.env.OPENAI_MODEL,
       });
 
+      // 5. Charge credits after successful reply generation
+      const { balance: newBalance } = await storage.adjustImmortalityCredits({
+        userId,
+        credits: -CREDITS_PER_MESSAGE, // Negative to deduct
+        source: "chat_message",
+        reference: `chat_${Date.now()}`,
+        metadata: { 
+          message: body.message.substring(0, 100), // Store first 100 chars
+        },
+      });
+
+      // 6. Build actions from message, suggestedActions, and memories
+      // Convert memories createdAt from Date to string
+      const memoriesForActions = memories.map(m => ({
+        id: m.id,
+        text: m.text,
+        createdAt: m.createdAt instanceof Date ? m.createdAt.toISOString() : String(m.createdAt),
+      }));
+      const actions = buildImmortalityActions({
+        message: body.message,
+        suggestedActions,
+        memories: memoriesForActions,
+        currentBalance: newBalance.immortalityCredits, // Use updated balance
+      });
+
+      // 7. Return response with billing info
       res.json({
         reply,
         profileUsed: !!profile,
         memoryCount: memories.length,
         suggestedActions,
+        actions,
+        creditsCharged: CREDITS_PER_MESSAGE,
+        newBalance: newBalance.immortalityCredits,
       });
     } catch (error: any) {
       console.error("Error generating chat reply:", error);
@@ -693,12 +965,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Unified identity endpoints
   app.get("/api/auth/identities", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      const userId = req.user?.claims?.sub;
+      if (!userId) {
+        console.error("[Auth] User ID not found in claims:", req.user);
+        return res.status(400).json({ message: "User ID not found in session" });
+      }
+      
       const identities = await storage.getUserIdentities(userId);
       res.json({ identities });
     } catch (error: any) {
-      console.error("List identities error:", error);
-      res.status(500).json({ message: "Failed to list identities" });
+      console.error("[Auth] List identities error:", error);
+      res.status(500).json({ 
+        message: "Failed to list identities",
+        error: error?.message 
+      });
     }
   });
 
@@ -1028,6 +1308,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
                   currency: fiatTx.currency,
                 },
               });
+              
+              // Update user plan to "paid" when payment is successful
+              await storage.updateUserPlan(fiatTx.userId, "paid");
+              console.log(`[Stripe] Updated user ${fiatTx.userId} plan to paid`);
             }
           }
           break;
@@ -1087,7 +1371,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(401).json({ message: "Authentication required" });
       }
 
-      const baseUrl = process.env.BASE_URL || "http://localhost:5173";
+      // Get base URL dynamically
+      let baseUrl = process.env.BASE_URL;
+      if (!baseUrl) {
+        const origin = req.headers.origin || req.headers.referer;
+        if (origin) {
+          try {
+            const url = new URL(origin);
+            baseUrl = `${url.protocol}//${url.host}`;
+          } catch (e) {
+            baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+          }
+        } else {
+          baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+        }
+      }
       const amountInCents = Math.round(amount * 100);
       
       // Get current user if logged in
@@ -1126,7 +1424,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         }],
         mode: 'payment',
         success_url: `${baseUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${baseUrl}`,
+        cancel_url: `${baseUrl}/app/recharge`,
         metadata: {
           transactionId: transaction.id,
           userId: userId || 'anonymous',
@@ -1164,7 +1462,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const amountInCents = Math.round(amount * 100);
       const credits = Math.round(amount);
-      const baseUrl = process.env.BASE_URL || "http://localhost:5173";
+      
+      // Get base URL from environment or request origin
+      // If BASE_URL is set, use it; otherwise try to detect from request
+      let baseUrl = process.env.BASE_URL;
+      if (!baseUrl) {
+        // Try to get from request origin (works in dev/prod)
+        const origin = req.headers.origin || req.headers.referer;
+        if (origin) {
+          try {
+            const url = new URL(origin);
+            baseUrl = `${url.protocol}//${url.host}`;
+          } catch (e) {
+            // Fallback to default
+            baseUrl = "http://localhost:5000"; // Default to backend port in dev
+          }
+        } else {
+          // Fallback to backend port (works when using npm run dev with Vite middleware)
+          baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+        }
+      }
 
       const fiatTx = await storage.createFiatTransaction({
         userId,
@@ -1195,8 +1512,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
           },
         ],
         mode: "payment",
-        success_url: `${baseUrl}/recharge?session_id={CHECKOUT_SESSION_ID}`,
-        cancel_url: `${baseUrl}/recharge`,
+        // Use backend payment-success page first, then redirect to frontend
+        // This ensures payment is always processed even if frontend URL is wrong
+        success_url: `${baseUrl}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
+        cancel_url: `${baseUrl}/app/recharge`,
         metadata: {
           fiatTransactionId: fiatTx.id,
           userId,
@@ -1213,9 +1532,299 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Verify and process Stripe payment session (fallback when webhook is not connected)
+  // This endpoint is called when user returns from Stripe Checkout
+  app.post("/api/stripe/verify-session", isAuthenticated, async (req: any, res) => {
+    try {
+      const { session_id } = req.body;
+      if (!session_id) {
+        return res.status(400).json({ message: "session_id is required" });
+      }
+
+      const userId = req.user.claims.sub;
+      console.log(`[Stripe] Verifying session ${session_id} for user ${userId}`);
+
+      // Retrieve session from Stripe
+      const session = await stripe.checkout.sessions.retrieve(session_id);
+
+      if (session.payment_status !== "paid") {
+        return res.json({
+          success: false,
+          message: "Payment not completed",
+          payment_status: session.payment_status,
+        });
+      }
+
+      // Check if we already processed this session
+      const fiatTx = await storage.getFiatTransactionBySessionId(session_id);
+      
+      if (!fiatTx) {
+        return res.status(404).json({ message: "Transaction not found for this session" });
+      }
+
+      // Verify user matches
+      if (fiatTx.userId !== userId) {
+        return res.status(403).json({ message: "Session does not belong to current user" });
+      }
+
+      // If already completed, just return success
+      if (fiatTx.status === "completed") {
+        return res.json({
+          success: true,
+          message: "Payment already processed",
+          credits: fiatTx.credits,
+        });
+      }
+
+      // Process payment (same logic as webhook)
+      await storage.updateFiatTransaction(fiatTx.id, {
+        status: "completed",
+        metadata: {
+          ...(fiatTx.metadata || {}),
+          verifiedVia: "api",
+          paymentIntentId: session.payment_intent,
+        },
+      });
+
+      if (fiatTx.credits > 0 && fiatTx.userId) {
+        await storage.adjustImmortalityCredits({
+          userId: fiatTx.userId,
+          credits: fiatTx.credits,
+          source: "stripe",
+          reference: session_id,
+          metadata: {
+            amountFiat: fiatTx.amountFiat,
+            currency: fiatTx.currency,
+            verifiedVia: "api",
+          },
+        });
+
+        // Update user plan to "paid"
+        await storage.updateUserPlan(fiatTx.userId, "paid");
+        console.log(`[Stripe] Verified and updated user ${fiatTx.userId} plan to paid via API`);
+      }
+
+      res.json({
+        success: true,
+        message: "Payment verified and processed",
+        credits: fiatTx.credits,
+      });
+    } catch (error: any) {
+      console.error("[Stripe] Error verifying session:", error);
+      res.status(500).json({
+        success: false,
+        message: error.message || "Failed to verify payment session",
+      });
+    }
+  });
+
+  // Payment success page (fallback when frontend URL is not accessible)
+  // This page verifies and processes payment even if Stripe redirect fails
+  app.get("/payment-success", isAuthenticated, async (req: any, res) => {
+    try {
+      // Get base URL dynamically for redirects
+      let baseUrl = process.env.BASE_URL;
+      if (!baseUrl) {
+        const origin = req.headers.origin || req.headers.referer;
+        if (origin) {
+          try {
+            const url = new URL(origin);
+            baseUrl = `${url.protocol}//${url.host}`;
+          } catch (e) {
+            baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+          }
+        } else {
+          baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+        }
+      }
+
+      const { session_id } = req.query;
+      if (!session_id || typeof session_id !== "string") {
+        return res.status(400).send(`
+          <html>
+            <head><title>Payment Verification</title>
+            <meta http-equiv="refresh" content="3;url=${baseUrl}/app/recharge">
+            <style>
+              body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+              .error { color: #dc2626; }
+            </style>
+            </head>
+            <body>
+              <h1>Payment Verification</h1>
+              <p class="error">No session ID provided. Redirecting to recharge page...</p>
+              <p><a href="${baseUrl}/app/recharge">← Back to Recharge</a></p>
+            </body>
+          </html>
+        `);
+      }
+
+      const userId = req.user.claims.sub;
+      console.log(`[PaymentSuccess] Processing session ${session_id} for user ${userId}`);
+
+      // Retrieve session from Stripe
+      const session = await stripe.checkout.sessions.retrieve(session_id);
+
+      if (session.payment_status !== "paid") {
+        return res.send(`
+          <html>
+            <head><title>Payment Not Completed</title></head>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px;">
+              <h1>Payment Not Completed</h1>
+              <p>Payment status: <strong>${session.payment_status}</strong></p>
+              <p><a href="${baseUrl}/app/recharge">← Back to Recharge</a></p>
+            </body>
+          </html>
+        `);
+      }
+
+      // Check if we already processed this session
+      const fiatTx = await storage.getFiatTransactionBySessionId(session_id);
+      
+      if (!fiatTx) {
+        return res.status(404).send(`
+          <html>
+            <head><title>Transaction Not Found</title></head>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px;">
+              <h1>Transaction Not Found</h1>
+              <p>No transaction found for this session. Please contact support.</p>
+              <p><a href="${baseUrl}/app/recharge">← Back to Recharge</a></p>
+            </body>
+          </html>
+        `);
+      }
+
+      // Verify user matches
+      if (fiatTx.userId !== userId) {
+        return res.status(403).send(`
+          <html>
+            <head><title>Access Denied</title></head>
+            <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px;">
+              <h1>Access Denied</h1>
+              <p>This session does not belong to your account.</p>
+              <p><a href="${baseUrl}/app/recharge">← Back to Recharge</a></p>
+            </body>
+          </html>
+        `);
+      }
+
+      // If already completed, show success and redirect
+      if (fiatTx.status === "completed") {
+        return res.send(`
+          <html>
+            <head><title>Payment Successful</title>
+            <meta http-equiv="refresh" content="2;url=${baseUrl}/app/recharge?session_id=${session_id}&verified=true">
+            <style>
+              body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center; }
+              .success { color: #16a34a; font-size: 48px; margin: 20px 0; }
+            </style>
+            </head>
+            <body>
+              <div class="success">✅</div>
+              <h1>Payment Successful</h1>
+              <p>Your payment has already been processed.</p>
+              <p><strong>Credits:</strong> ${fiatTx.credits}</p>
+              <p><strong>Status:</strong> Completed</p>
+              <p>Redirecting to recharge page...</p>
+              <p><a href="${baseUrl}/app/recharge">← Go to Recharge</a></p>
+            </body>
+          </html>
+        `);
+      }
+
+      // Process payment (same logic as webhook and verify-session API)
+      await storage.updateFiatTransaction(fiatTx.id, {
+        status: "completed",
+        metadata: {
+          ...(fiatTx.metadata || {}),
+          verifiedVia: "payment-success-page",
+          paymentIntentId: session.payment_intent,
+        },
+      });
+
+      if (fiatTx.credits > 0 && fiatTx.userId) {
+        await storage.adjustImmortalityCredits({
+          userId: fiatTx.userId,
+          credits: fiatTx.credits,
+          source: "stripe",
+          reference: session_id,
+          metadata: {
+            amountFiat: fiatTx.amountFiat,
+            currency: fiatTx.currency,
+            verifiedVia: "payment-success-page",
+          },
+        });
+
+        // Update user plan to "paid"
+        await storage.updateUserPlan(fiatTx.userId, "paid");
+        console.log(`[PaymentSuccess] Updated user ${fiatTx.userId} plan to paid via payment success page`);
+      }
+
+      // Redirect to frontend recharge page
+      return res.send(`
+        <html>
+          <head><title>Payment Successful</title>
+          <meta http-equiv="refresh" content="2;url=${baseUrl}/app/recharge?session_id=${session_id}&verified=true">
+          <style>
+            body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; text-align: center; }
+            .success { color: #16a34a; font-size: 48px; margin: 20px 0; }
+            .loading { color: #6b7280; }
+          </style>
+          </head>
+          <body>
+            <div class="success">✅</div>
+            <h1>Payment Successful!</h1>
+            <p>Your payment has been processed successfully.</p>
+            <p><strong>Credits Added:</strong> ${fiatTx.credits}</p>
+            <p><strong>Access Pass:</strong> Activated ✅</p>
+            <p class="loading">Redirecting to recharge page...</p>
+            <p><a href="${baseUrl}/app/recharge">← Go to Recharge Page</a></p>
+          </body>
+        </html>
+      `);
+    } catch (error: any) {
+      console.error("[PaymentSuccess] Error processing payment:", error);
+      
+      // Get baseUrl for error page too
+      let baseUrl = process.env.BASE_URL;
+      if (!baseUrl) {
+        const origin = req.headers.origin || req.headers.referer;
+        if (origin) {
+          try {
+            const url = new URL(origin);
+            baseUrl = `${url.protocol}//${url.host}`;
+          } catch (e) {
+            baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+          }
+        } else {
+          baseUrl = `http://localhost:${process.env.PORT || 5000}`;
+        }
+      }
+      
+      return res.status(500).send(`
+        <html>
+          <head><title>Payment Processing Error</title></head>
+          <body style="font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px;">
+            <h1>Payment Processing Error</h1>
+            <p>An error occurred while processing your payment: <strong>${error.message}</strong></p>
+            <p>Your payment was successful on Stripe. Please contact support if credits are not added within 24 hours.</p>
+            <p><a href="${baseUrl}/app/recharge">← Back to Recharge</a></p>
+          </body>
+        </html>
+      `);
+    }
+  });
+
   app.get("/api/immortality/balance", isAuthenticated, async (req: any, res) => {
     try {
-      const userId = req.user.claims.sub;
+      // Support demoUserId query param or header (dev/staging only)
+      const demoUserId = req.query.demoUserId || req.headers["x-demo-user-id"];
+      let userId = req.user.claims.sub;
+
+      if (demoUserId && process.env.NODE_ENV !== "production") {
+        // Use demo user ID instead of session user ID
+        userId = demoUserId;
+      }
+
       const balance = await storage.getUserBalance(userId);
       res.json({
         credits: balance?.immortalityCredits ?? 0,
@@ -1768,6 +2377,85 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("Error processing referral:", error);
       res.status(500).json({ message: "Failed to process referral" });
+    }
+  });
+
+  // Test Scenarios Routes
+  app.post("/api/test-scenarios/run", async (req: any, res) => {
+    try {
+      // Read demoUserId from header or body
+      const demoUserId =
+        req.headers["x-demo-user-id"] || req.body.demoUserId || `demo-${Date.now()}`;
+
+      const { scenarioKey, params = {} } = req.body;
+
+      if (!scenarioKey) {
+        return res.status(400).json({
+          success: false,
+          error: { code: "INVALID_REQUEST", message: "scenarioKey is required" },
+        });
+      }
+
+      // Import testScenarioRunnerV2 dynamically
+      const { testScenarioRunnerV2 } = await import("./services/testScenarioRunnerV2");
+
+      const result = await testScenarioRunnerV2.runScenario(
+        scenarioKey as any,
+        demoUserId,
+        params
+      );
+
+      res.json(result);
+    } catch (error: any) {
+      console.error("[TestScenarios] Error running scenario:", error);
+      res.status(500).json({
+        success: false,
+        error: {
+          code: "INTERNAL_ERROR",
+          message: error?.message || "Internal server error",
+        },
+      });
+    }
+  });
+
+  // Get test run details
+  app.get("/api/test-runs/:runId", async (req: any, res) => {
+    try {
+      const { runId } = req.params;
+      const run = await storage.getTestRun(runId);
+      if (!run) {
+        return res.status(404).json({ message: "Test run not found" });
+      }
+
+      const steps = await storage.getTestSteps(runId);
+
+      res.json({
+        ...run,
+        steps,
+      });
+    } catch (error: any) {
+      console.error("[TestRuns] Error fetching run:", error);
+      res.status(500).json({ message: "Failed to fetch test run" });
+    }
+  });
+
+  // Vault Agent Permissions
+  app.post("/api/vaults/:vaultId/agents/grant", async (req: any, res) => {
+    try {
+      const { vaultId } = req.params;
+      const { agentId, scopes, constraints } = req.body;
+
+      if (!agentId || !scopes || !Array.isArray(scopes)) {
+        return res.status(400).json({ message: "agentId and scopes array are required" });
+      }
+
+      const { agentPermissionService } = await import("./services/agentPermissionService");
+      const permission = await agentPermissionService.grant(vaultId, agentId, scopes, constraints);
+
+      res.json({ success: true, permissionId: permission.id });
+    } catch (error: any) {
+      console.error("[VaultPermissions] Error granting permission:", error);
+      res.status(500).json({ message: "Failed to grant permission" });
     }
   });
 

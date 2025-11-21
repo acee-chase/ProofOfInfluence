@@ -40,6 +40,7 @@ export const users = pgTable("users", {
   username: text("username").unique(),
   walletAddress: text("wallet_address").unique(),
   role: varchar("role", { length: 20 }).default("user").notNull(), // user, admin
+  plan: varchar("plan", { length: 10 }).default("free"), // free, paid
   // Metadata
   createdAt: timestamp("created_at").defaultNow(),
   updatedAt: timestamp("updated_at").defaultNow(),
@@ -508,6 +509,7 @@ export const insertTaxReportSchema = createInsertSchema(taxReports).omit({
 // Types
 export type InsertUser = z.infer<typeof insertUserSchema>;
 export type UpsertUser = z.infer<typeof upsertUserSchema>;
+export type UserPlan = "free" | "paid";
 export type User = typeof users.$inferSelect;
 
 export type InsertProfile = z.infer<typeof insertProfileSchema>;
@@ -787,3 +789,208 @@ export const eventSyncState = pgTable("event_sync_state", {
 export const insertEventSyncStateSchema = createInsertSchema(eventSyncState);
 export type InsertEventSyncState = z.infer<typeof insertEventSyncStateSchema>;
 export type EventSyncState = typeof eventSyncState.$inferSelect;
+
+// Test wallets for automated scenario runner
+export const testWallets = pgTable(
+  "test_wallets",
+  {
+    id: serial("id").primaryKey(),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull().unique(),
+    privateKey: text("private_key").notNull(), // encrypted
+    chainId: integer("chain_id").notNull(),
+    network: varchar("network", { length: 50 }).notNull(),
+    userId: varchar("user_id").references(() => users.id, { onDelete: "set null" }),
+    label: varchar("label", { length: 255 }),
+    scenario: varchar("scenario", { length: 100 }),
+    status: varchar("status", { length: 20 }).default("idle").notNull(), // idle/in_use/locked/disabled
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+    lastUsedAt: timestamp("last_used_at"),
+  },
+  (table) => [
+    index("test_wallets_address_idx").on(table.walletAddress),
+    index("test_wallets_scenario_idx").on(table.scenario),
+    index("test_wallets_status_idx").on(table.status),
+    index("test_wallets_user_id_idx").on(table.userId),
+  ],
+);
+
+export const insertTestWalletSchema = createInsertSchema(testWallets).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+  lastUsedAt: true,
+});
+
+export type InsertTestWallet = z.infer<typeof insertTestWalletSchema>;
+export type TestWallet = typeof testWallets.$inferSelect;
+
+// UserVault tables
+export const userVaults = pgTable(
+  "user_vaults",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    ownerUserId: varchar("owner_user_id").references(() => users.id, { onDelete: "cascade" }),
+    type: varchar("type", { length: 20 }).notNull().default("demo"), // demo|test|real|system
+    label: varchar("label", { length: 255 }),
+    metadata: jsonb("metadata"),
+    status: varchar("status", { length: 20 }).notNull().default("active"), // active|inactive|archived
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("user_vaults_owner_idx").on(table.ownerUserId),
+    index("user_vaults_type_idx").on(table.type),
+    index("user_vaults_status_idx").on(table.status),
+  ],
+);
+
+export const vaultWallets = pgTable(
+  "vault_wallets",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    vaultId: varchar("vault_id")
+      .notNull()
+      .references(() => userVaults.id, { onDelete: "cascade" }),
+    walletAddress: varchar("wallet_address", { length: 42 }).notNull(),
+    chainId: integer("chain_id").notNull().default(84532), // base-sepolia
+    network: varchar("network", { length: 50 }).notNull().default("base-sepolia"),
+    role: varchar("role", { length: 20 }).notNull().default("nft"), // nft|gas|test|primary
+    status: varchar("status", { length: 20 }).notNull().default("idle"), // idle|in_use|locked|disabled
+    metadata: jsonb("metadata"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    lastUsedAt: timestamp("last_used_at"),
+  },
+  (table) => [
+    index("vault_wallets_vault_id_idx").on(table.vaultId),
+    index("vault_wallets_address_idx").on(table.walletAddress),
+    index("vault_wallets_chain_id_idx").on(table.chainId),
+  ],
+);
+
+export const agents = pgTable("agents", {
+  id: varchar("id", { length: 100 }).primaryKey(), // e.g. 'immortality-ai' or 'system-admin'
+  type: varchar("type", { length: 20 }).notNull(), // 'user' | 'system'
+  name: varchar("name", { length: 255 }),
+  walletAddress: varchar("wallet_address", { length: 42 }),
+  metadata: jsonb("metadata"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const vaultAgentPermissions = pgTable(
+  "vault_agent_permissions",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    vaultId: varchar("vault_id")
+      .notNull()
+      .references(() => userVaults.id, { onDelete: "cascade" }),
+    agentId: varchar("agent_id", { length: 100 })
+      .notNull()
+      .references(() => agents.id, { onDelete: "cascade" }),
+    scopes: jsonb("scopes").notNull(), // ["memory.read", "badge.mint", ...]
+    constraints: jsonb("constraints"), // { maxMints: 1, expiresAt: ... }
+    status: varchar("status", { length: 20 }).notNull().default("active"), // active|revoked
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("vault_agent_permissions_vault_id_idx").on(table.vaultId),
+    index("vault_agent_permissions_agent_id_idx").on(table.agentId),
+    index("vault_agent_permissions_status_idx").on(table.status),
+    uniqueIndex("vault_agent_permissions_unique").on(table.vaultId, table.agentId),
+  ],
+);
+
+export const testRuns = pgTable(
+  "test_runs",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    scenarioKey: varchar("scenario_key", { length: 100 }).notNull(),
+    demoUserId: varchar("demo_user_id"),
+    vaultId: varchar("vault_id").references(() => userVaults.id, { onDelete: "set null" }),
+    status: varchar("status", { length: 20 }).notNull(), // running|success|failed
+    result: jsonb("result"),
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+    updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("test_runs_scenario_key_idx").on(table.scenarioKey),
+    index("test_runs_demo_user_id_idx").on(table.demoUserId),
+    index("test_runs_status_idx").on(table.status),
+  ],
+);
+
+export const testSteps = pgTable(
+  "test_steps",
+  {
+    id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+    runId: varchar("run_id")
+      .notNull()
+      .references(() => testRuns.id, { onDelete: "cascade" }),
+    name: varchar("name", { length: 100 }).notNull(),
+    status: varchar("status", { length: 20 }).notNull(), // success|failed
+    input: jsonb("input"),
+    output: jsonb("output"),
+    error: jsonb("error"), // { code, message, cause, data }
+    createdAt: timestamp("created_at").defaultNow().notNull(),
+  },
+  (table) => [
+    index("test_steps_run_id_idx").on(table.runId),
+    index("test_steps_status_idx").on(table.status),
+  ],
+);
+
+// Insert schemas
+export const insertUserVaultSchema = createInsertSchema(userVaults).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertVaultWalletSchema = createInsertSchema(vaultWallets).omit({
+  id: true,
+  createdAt: true,
+  lastUsedAt: true,
+});
+
+export const insertAgentSchema = createInsertSchema(agents).omit({
+  createdAt: true,
+});
+
+export const insertVaultAgentPermissionSchema = createInsertSchema(vaultAgentPermissions).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTestRunSchema = createInsertSchema(testRuns).omit({
+  id: true,
+  createdAt: true,
+  updatedAt: true,
+});
+
+export const insertTestStepSchema = createInsertSchema(testSteps).omit({
+  id: true,
+  createdAt: true,
+});
+
+// Types
+export type InsertUserVault = z.infer<typeof insertUserVaultSchema>;
+export type UserVault = typeof userVaults.$inferSelect;
+
+export type InsertVaultWallet = z.infer<typeof insertVaultWalletSchema>;
+export type VaultWallet = typeof vaultWallets.$inferSelect;
+
+export type InsertAgent = z.infer<typeof insertAgentSchema>;
+export type Agent = typeof agents.$inferSelect;
+
+export type InsertVaultAgentPermission = z.infer<typeof insertVaultAgentPermissionSchema>;
+export type VaultAgentPermission = typeof vaultAgentPermissions.$inferSelect;
+
+export type InsertTestRun = z.infer<typeof insertTestRunSchema>;
+export type TestRun = typeof testRuns.$inferSelect;
+
+export type InsertTestStep = z.infer<typeof insertTestStepSchema>;
+export type TestStep = typeof testSteps.$inferSelect;
+

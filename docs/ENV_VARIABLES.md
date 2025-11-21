@@ -29,6 +29,12 @@ APP_DOMAIN=proofofinfluence.onrender.com  # 用于钱包登录 message
 ```env
 # 部署者私钥 (⚠️ 不要提交到Git!)
 PRIVATE_KEY=your_private_key_here
+# 或使用 DEPLOYER_PRIVATE_KEY
+DEPLOYER_PRIVATE_KEY=your_private_key_here
+
+# AgentKit 钱包私钥（用于后端操作：铸造徽章等）
+# 如果未设置，会回退到 PRIVATE_KEY 或 DEPLOYER_PRIVATE_KEY
+AGENTKIT_PRIVATE_KEY=your_agentkit_private_key_here
 
 # 网络选择
 # 支持: mainnet, sepolia, base, base-sepolia, arbitrum, polygon

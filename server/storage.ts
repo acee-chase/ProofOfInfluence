@@ -33,6 +33,9 @@ import {
   agentkitActions,
   badges,
   eventSyncState,
+  testWallets,
+  testRuns,
+  testSteps,
   type User,
   type UpsertUser,
   type InsertUser,
@@ -100,6 +103,20 @@ import {
   type InsertBadge,
   type EventSyncState,
   type InsertEventSyncState,
+  type TestWallet,
+  type InsertTestWallet,
+  type UserVault,
+  type InsertUserVault,
+  type VaultWallet,
+  type InsertVaultWallet,
+  type Agent,
+  type InsertAgent,
+  type VaultAgentPermission,
+  type InsertVaultAgentPermission,
+  type TestRun,
+  type InsertTestRun,
+  type TestStep,
+  type InsertTestStep,
 } from "@shared/schema";
 import { db } from "./db";
 import { eq, and, desc, sql, gte, or, lte } from "drizzle-orm";
@@ -115,6 +132,7 @@ export interface IStorage {
   findOrCreateUserByWallet(walletAddress: string): Promise<User>;
   updateUserWallet(userId: string, walletAddress: string): Promise<User>;
   updateUserUsername(userId: string, username: string): Promise<User>;
+  updateUserPlan(userId: string, plan: "free" | "paid"): Promise<User>;
   
   // Profile operations
   getProfile(userId: string): Promise<Profile | undefined>;
@@ -280,6 +298,14 @@ export interface IStorage {
   // Event sync state
   getEventSyncState(contractName: string): Promise<EventSyncState | undefined>;
   upsertEventSyncState(state: InsertEventSyncState): Promise<EventSyncState>;
+  
+  // Test wallet operations
+  createTestWallet(data: InsertTestWallet): Promise<TestWallet>;
+  getTestWallet(id: number): Promise<TestWallet | undefined>;
+  getTestWalletByAddress(address: string): Promise<TestWallet | undefined>;
+  getTestWalletsByScenario(scenario: string): Promise<TestWallet[]>;
+  updateTestWalletStatus(id: number, status: string): Promise<TestWallet>;
+  getAvailableTestWallets(scenario: string): Promise<TestWallet[]>;
 }
 
 export class DatabaseStorage implements IStorage {
@@ -355,6 +381,15 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db
       .update(users)
       .set({ username, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async updateUserPlan(userId: string, plan: "free" | "paid"): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ plan, updatedAt: new Date() })
       .where(eq(users.id, userId))
       .returning();
     return user;
@@ -1669,6 +1704,111 @@ export class DatabaseStorage implements IStorage {
       .from(eventSyncState)
       .where(eq(eventSyncState.contractName, contractName));
     return state?.lastBlockNumber || null;
+  }
+
+  // Test wallet operations
+  async createTestWallet(data: InsertTestWallet): Promise<TestWallet> {
+    const [wallet] = await db
+      .insert(testWallets)
+      .values({
+        ...data,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      })
+      .returning();
+    return wallet;
+  }
+
+  async getTestWallet(id: number): Promise<TestWallet | undefined> {
+    const [wallet] = await db
+      .select()
+      .from(testWallets)
+      .where(eq(testWallets.id, id));
+    return wallet;
+  }
+
+  async getTestWalletByAddress(address: string): Promise<TestWallet | undefined> {
+    const [wallet] = await db
+      .select()
+      .from(testWallets)
+      .where(eq(testWallets.walletAddress, address.toLowerCase()));
+    return wallet;
+  }
+
+  async getTestWalletsByScenario(scenario: string): Promise<TestWallet[]> {
+    return await db
+      .select()
+      .from(testWallets)
+      .where(eq(testWallets.scenario, scenario))
+      .orderBy(desc(testWallets.createdAt));
+  }
+
+  async updateTestWalletStatus(id: number, status: string): Promise<TestWallet> {
+    const [wallet] = await db
+      .update(testWallets)
+      .set({
+        status,
+        updatedAt: new Date(),
+        lastUsedAt: status === "in_use" ? new Date() : undefined,
+      })
+      .where(eq(testWallets.id, id))
+      .returning();
+    if (!wallet) {
+      throw new Error(`Test wallet with id ${id} not found`);
+    }
+    return wallet;
+  }
+
+  async getAvailableTestWallets(scenario: string): Promise<TestWallet[]> {
+    return await db
+      .select()
+      .from(testWallets)
+      .where(
+        and(
+          eq(testWallets.scenario, scenario),
+          eq(testWallets.status, "idle")
+        )
+      )
+      .orderBy(desc(testWallets.lastUsedAt));
+  }
+
+  // Test Runs & Steps
+  async createTestRun(run: InsertTestRun): Promise<TestRun> {
+    const [created] = await db.insert(testRuns).values(run).returning();
+    return created;
+  }
+
+  async updateTestRun(runId: string, updates: Partial<InsertTestRun>): Promise<TestRun> {
+    const [updated] = await db
+      .update(testRuns)
+      .set({
+        ...updates,
+        updatedAt: new Date(),
+      })
+      .where(eq(testRuns.id, runId))
+      .returning();
+    if (!updated) {
+      throw new Error(`Test run with id ${runId} not found`);
+    }
+    return updated;
+  }
+
+  async getTestRun(runId: string): Promise<TestRun | undefined> {
+    const [run] = await db.select().from(testRuns).where(eq(testRuns.id, runId)).limit(1);
+    return run;
+  }
+
+  async createTestStep(step: InsertTestStep): Promise<TestStep> {
+    const [created] = await db.insert(testSteps).values(step).returning();
+    return created;
+  }
+
+  async getTestSteps(runId: string): Promise<TestStep[]> {
+    return await db
+      .select()
+      .from(testSteps)
+      .where(eq(testSteps.runId, runId))
+      .orderBy(testSteps.createdAt);
   }
 }
 

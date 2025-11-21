@@ -1,5 +1,6 @@
 import dotenv from "dotenv";
-dotenv.config();
+// Use override: true to ensure .env file values override system environment variables
+dotenv.config({ override: true });
 
 import { drizzle } from "drizzle-orm/neon-serverless";
 import { Pool, neonConfig } from "@neondatabase/serverless";

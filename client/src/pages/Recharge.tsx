@@ -1,5 +1,5 @@
 import React, { useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 import { PageLayout } from "@/components/layout/PageLayout";
 import { Section } from "@/components/layout/Section";
 import { ThemedCard, ThemedButton } from "@/components/themed";
@@ -10,6 +10,7 @@ import { useAuth } from "@/hooks/useAuth";
 import StripePayment from "@/components/StripePayment";
 import { Shield, Wallet, Coins, ArrowRight } from "lucide-react";
 import { ROUTES } from "@/routes";
+import { queryClient } from "@/lib/queryClient";
 
 interface ImmortalityBalanceResponse {
   credits: number;
@@ -26,21 +27,62 @@ export default function Recharge() {
     enabled: isAuthenticated,
   });
 
+  // Verify Stripe session when returning from checkout
+  const verifySessionMutation = useMutation({
+    mutationFn: async (sessionId: string) => {
+      const response = await fetch("/api/stripe/verify-session", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ session_id: sessionId }),
+      });
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({}));
+        throw new Error(error.message || "Failed to verify payment");
+      }
+      return response.json();
+    },
+    onSuccess: async (data) => {
+      // Refresh balance and user info
+      await refetch();
+      await queryClient.invalidateQueries({ queryKey: ["/api/auth/user"] });
+      
+      if (data.success) {
+        toast({
+          title: "支付成功",
+          description: `已成功充值 ${data.credits} 点 Credits，Access Pass 已激活。`,
+        });
+      }
+    },
+    onError: (error: any) => {
+      console.error("Payment verification error:", error);
+      toast({
+        title: "验证支付时出错",
+        description: error.message || "请稍后刷新页面查看余额，或联系客服。",
+        variant: "destructive",
+      });
+    },
+  });
+
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const sessionId = params.get("session_id");
-    if (sessionId) {
+    if (sessionId && isAuthenticated) {
       toast({
         title: "充值处理中",
-        description: "Stripe 支付已完成，余额即将更新。",
+        description: "正在验证 Stripe 支付状态...",
       });
-      refetch();
+      
+      // Verify session with Stripe (works even if webhook is not connected)
+      verifySessionMutation.mutate(sessionId);
+      
+      // Clean up URL
       params.delete("session_id");
       const newUrl =
         window.location.pathname + (params.toString() ? `?${params.toString()}` : "");
       window.history.replaceState({}, "", newUrl);
     }
-  }, [refetch, toast]);
+  }, [isAuthenticated, verifySessionMutation, toast]);
 
   const credits = balance?.credits ?? 0;
 

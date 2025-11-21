@@ -6,9 +6,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Menu, X, ChevronDown, ShoppingCart, Briefcase, Palette } from "lucide-react";
+import { Menu, X, ChevronDown, ShoppingCart, Briefcase, Palette, Settings } from "lucide-react";
 import { useState } from "react";
 import { useAuth } from "@/hooks/useAuth";
+import { useAdminAccess } from "@/hooks/useAdminAccess";
 import WalletConnectButton from "@/components/WalletConnectButton";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ export default function Header({ lang = "zh" }: HeaderProps) {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [location] = useLocation();
   const { isAuthenticated } = useAuth();
+  const { isAdmin } = useAdminAccess();
   const { theme, toggleTheme } = useTheme();
 
   // Hide Connect Wallet and Login button on /login page
@@ -43,6 +45,7 @@ export default function Header({ lang = "zh" }: HeaderProps) {
       ];
 
   // Resources dropdown items
+  const isDev = import.meta.env.MODE === "development" || import.meta.env.DEV;
   const resourceItems = lang === "zh"
     ? [
         { label: "解决方案", href: ROUTES.SOLUTIONS },
@@ -51,6 +54,8 @@ export default function Header({ lang = "zh" }: HeaderProps) {
         { label: "关于我们", href: ROUTES.ABOUT },
         { label: "TGE 启动", href: ROUTES.TGE },
         { label: "早鸟空投", href: ROUTES.EARLY_BIRD },
+        ...(isDev ? [{ label: "合约调试", href: ROUTES.APP_DEV_CONTRACTS }] : []),
+        ...(isAdmin ? [{ label: "AgentKit 配置", href: ROUTES.APP_DEV_AGENTKIT }] : []),
       ]
     : [
         { label: "Solutions", href: ROUTES.SOLUTIONS },
@@ -60,11 +65,14 @@ export default function Header({ lang = "zh" }: HeaderProps) {
         { label: "TGE Launch", href: ROUTES.TGE },
         { label: "Early-Bird", href: ROUTES.EARLY_BIRD },
         { label: "Company", href: ROUTES.ABOUT },
+        ...(isDev ? [{ label: "Dev / Contracts", href: ROUTES.APP_DEV_CONTRACTS }] : []),
+        ...(isAdmin ? [{ label: "AgentKit Config", href: ROUTES.APP_DEV_AGENTKIT }] : []),
       ];
 
   const resourcesLabel = lang === "zh" ? "资源" : "Resources";
   const projectXLabel = lang === "zh" ? "projectX" : "projectX";
   const loginLabel = lang === "zh" ? "登录" : "Login";
+  const settingsLabel = lang === "zh" ? "设置" : "Settings";
 
   const headerStyles = theme === 'cyberpunk'
     ? 'border-b border-cyan-400/20 bg-slate-950/95 backdrop-blur-sm'
@@ -89,15 +97,15 @@ export default function Header({ lang = "zh" }: HeaderProps) {
           {mainNavItems.map((item) => {
             const Icon = item.icon;
             return (
-              <Link key={item.href} href={item.href}>
-                <a
-                  className={`flex items-center gap-1.5 hover:text-white transition-colors ${
-                    location === item.href ? "text-white font-semibold" : "text-slate-400"
-                  } ${item.highlight ? "text-blue-400 font-semibold" : ""}`}
-                >
-                  {Icon && <Icon className="w-4 h-4" />}
-                  {item.label}
-                </a>
+              <Link
+                key={item.href}
+                href={item.href}
+                className={`flex items-center gap-1.5 hover:text-white transition-colors ${
+                  location === item.href ? "text-white font-semibold" : "text-slate-400"
+                } ${item.highlight ? "text-blue-400 font-semibold" : ""}`}
+              >
+                {Icon && <Icon className="w-4 h-4" />}
+                {item.label}
               </Link>
             );
           })}
@@ -111,10 +119,11 @@ export default function Header({ lang = "zh" }: HeaderProps) {
             <DropdownMenuContent className="bg-slate-800 border-slate-700">
               {resourceItems.map((item) => (
                 <DropdownMenuItem key={item.href} asChild>
-                  <Link href={item.href}>
-                    <a className="w-full text-slate-300 hover:text-white cursor-pointer">
-                      {item.label}
-                    </a>
+                  <Link
+                    href={item.href}
+                    className="w-full text-slate-300 hover:text-white cursor-pointer"
+                  >
+                    {item.label}
                   </Link>
                 </DropdownMenuItem>
               ))}
@@ -150,14 +159,25 @@ export default function Header({ lang = "zh" }: HeaderProps) {
           {!isLoginPage && (
             <>
               {isAuthenticated ? (
-                <Link href={ROUTES.APP}>
-                  <Button
-                    variant="default"
-                    className="bg-white text-slate-900 hover:bg-slate-100"
-                  >
-                    {projectXLabel}
-                  </Button>
-                </Link>
+                <>
+                  <Link href={ROUTES.APP}>
+                    <Button
+                      variant="default"
+                      className="bg-white text-slate-900 hover:bg-slate-100"
+                    >
+                      {projectXLabel}
+                    </Button>
+                  </Link>
+                  <Link href={ROUTES.APP_SETTINGS}>
+                    <Button
+                      variant="outline"
+                      className="border-slate-700 hover:bg-slate-800"
+                      title={settingsLabel}
+                    >
+                      <Settings className="w-4 h-4" />
+                    </Button>
+                  </Link>
+                </>
               ) : (
                 <Link href={ROUTES.LOGIN}>
                   <Button
@@ -194,18 +214,18 @@ export default function Header({ lang = "zh" }: HeaderProps) {
             {mainNavItems.map((item) => {
               const Icon = item.icon;
               return (
-                <Link key={item.href} href={item.href}>
-                  <a
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors ${
-                      location === item.href
-                        ? "text-white bg-slate-800 font-semibold"
-                        : "text-slate-400"
-                    } ${item.highlight ? "text-blue-400 font-semibold" : ""}`}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    {Icon && <Icon className="w-4 h-4" />}
-                    {item.label}
-                  </a>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors ${
+                    location === item.href
+                      ? "text-white bg-slate-800 font-semibold"
+                      : "text-slate-400"
+                  } ${item.highlight ? "text-blue-400 font-semibold" : ""}`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {Icon && <Icon className="w-4 h-4" />}
+                  {item.label}
                 </Link>
               );
             })}
@@ -216,15 +236,15 @@ export default function Header({ lang = "zh" }: HeaderProps) {
                 {resourcesLabel}
               </div>
               {resourceItems.map((item) => (
-                <Link key={item.href} href={item.href}>
-                  <a
-                    className={`block px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors ${
-                      location === item.href ? "text-white bg-slate-800" : "text-slate-400"
-                    }`}
-                    onClick={() => setMobileMenuOpen(false)}
-                  >
-                    {item.label}
-                  </a>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`block px-4 py-2 rounded-lg hover:bg-slate-800 transition-colors ${
+                    location === item.href ? "text-white bg-slate-800" : "text-slate-400"
+                  }`}
+                  onClick={() => setMobileMenuOpen(false)}
+                >
+                  {item.label}
                 </Link>
               ))}
             </div>
