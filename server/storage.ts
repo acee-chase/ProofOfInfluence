@@ -132,6 +132,7 @@ export interface IStorage {
   findOrCreateUserByWallet(walletAddress: string): Promise<User>;
   updateUserWallet(userId: string, walletAddress: string): Promise<User>;
   updateUserUsername(userId: string, username: string): Promise<User>;
+  updateUserPlan(userId: string, plan: "free" | "paid"): Promise<User>;
   
   // Profile operations
   getProfile(userId: string): Promise<Profile | undefined>;
@@ -380,6 +381,15 @@ export class DatabaseStorage implements IStorage {
     const [user] = await db
       .update(users)
       .set({ username, updatedAt: new Date() })
+      .where(eq(users.id, userId))
+      .returning();
+    return user;
+  }
+
+  async updateUserPlan(userId: string, plan: "free" | "paid"): Promise<User> {
+    const [user] = await db
+      .update(users)
+      .set({ plan, updatedAt: new Date() })
       .where(eq(users.id, userId))
       .returning();
     return user;

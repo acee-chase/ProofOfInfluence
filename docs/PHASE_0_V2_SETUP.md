@@ -10,17 +10,26 @@
 
 ## 步骤 1：链上角色确认（MINTER_ROLE → AgentKit 钱包）
 
-### 1.1 获取 AgentKit 钱包地址
+### 1.1 获取钱包地址
+
+**重要更新**：我们已经从 CDP AgentKit 迁移到使用 ethers.js 钱包（固定私钥），解决了每次初始化创建新钱包的问题。
 
 ```bash
-npm run get:agentkit-address
+npm run get:wallet-address
 ```
 
-这将输出 AgentKit 钱包地址，将其添加到 `.env` 文件：
+这将从配置的私钥获取钱包地址。确保在 `.env` 文件中设置了以下之一：
 
 ```env
-CDP_WALLET_ADDRESS=0x...
+# 优先使用 AGENTKIT_PRIVATE_KEY（推荐）
+AGENTKIT_PRIVATE_KEY=0x...
+# 或使用现有的私钥
+PRIVATE_KEY=0x...
+# 或
+DEPLOYER_PRIVATE_KEY=0x...
 ```
+
+钱包地址将自动从私钥计算得出，确保每次初始化都使用相同的地址。
 
 ### 1.2 配置角色
 
