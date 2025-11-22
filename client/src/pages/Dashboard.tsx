@@ -9,6 +9,7 @@ import { AirdropCard } from "@/components/AirdropCard";
 import { AllowlistCard } from "@/components/AllowlistCard";
 import { ReferralCard } from "@/components/ReferralCard";
 import { BadgeCard } from "@/components/BadgeCard";
+import { PublicProfileCard } from "@/components/dashboard/PublicProfileCard";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import { Link } from "wouter";
@@ -151,6 +152,13 @@ export default function Dashboard() {
               Lv. {stats.xpLevel}
             </div>
           </ThemedCard>
+        </div>
+      </Section>
+
+      {/* Public Profile Section */}
+      <Section title="My Public Profile" subtitle="Share your profile with others">
+        <div className="max-w-3xl mx-auto">
+          <PublicProfileCard />
         </div>
       </Section>
 
