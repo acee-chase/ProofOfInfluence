@@ -13,8 +13,11 @@ import {
   type ActionResponse,
 } from "@/lib/immortalityActions";
 import { ChatPayment } from "@/components/ChatPayment";
+import { RwaTicker } from "./rwa/RwaTicker";
 import { useI18n } from "@/i18n";
 import { ImmortalityFlowStep, ImmortalityFlowState } from "../../../shared/immortality-flow";
+import { useImmortalityFlow } from "@/lib/immortality/flow/hook"; // Assuming this hook will be created or logic moved
+import type { RwaItem } from "../../../shared/types/rwa";
 import { handleImmortalityEvent, mapStepToReplyKey } from "@/lib/immortality/flow/engine";
 
 interface ActionMessage {
@@ -342,10 +345,47 @@ export function ImmortalityChat() {
     chatMutation.mutate(trimmed);
   };
 
+  const handleRwaSelected = (item: RwaItem) => {
+    // Dispatch RWA selection event to state machine
+    // This can trigger RWA_UNLOCK step if badge is already minted
+    const newState = handleImmortalityEvent(flowState, {
+      rwaItemId: item.id,
+    });
+    
+    if (newState.currentStep !== flowState.currentStep) {
+      setFlowState(newState);
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: t(mapStepToReplyKey(newState.currentStep)),
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+    } else {
+      setFlowState(newState);
+    }
+    
+    // Add user message and trigger chat
+    setMessages((prev) => [
+      ...prev,
+      {
+        role: "user",
+        content: `I'm interested in ${item.name}`,
+        timestamp: new Date().toISOString(),
+      },
+    ]);
+    chatMutation.mutate(`I'm interested in ${item.name}. Can you tell me more about this RWA asset?`);
+  };
+
   return (
-    <ThemedCard className="h-full p-6 flex flex-col">
-      {/* Header - Fixed */}
-      <div className="flex items-center justify-between mb-4 flex-shrink-0">
+    <ThemedCard className="h-full flex flex-col overflow-hidden">
+      {/* RWA Ticker */}
+      <RwaTicker onSelectItem={handleRwaSelected} />
+
+      <div className="flex flex-col flex-1 min-h-0 p-6">
+        {/* Header - Fixed */}
+        <div className="flex items-center justify-between mb-4 flex-shrink-0">
         <div className="flex items-center gap-2">
           <MessageSquare className="w-5 h-5" />
           <span className="font-semibold">{t('immortality.title')}</span>
@@ -482,7 +522,7 @@ export function ImmortalityChat() {
               {t('common.loading')}
             </>
           ) : (
-            t('common.confirm')
+            t('common.send')
           )}
         </ThemedButton>
       </div>

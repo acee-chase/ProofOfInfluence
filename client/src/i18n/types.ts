@@ -16,6 +16,10 @@ export interface Messages {
     profile: string;
     dashboard: string;
     settings: string;
+    send: string;
+    placeholder: {
+      dash: string;
+    };
   };
   landing: {
     hero: {
@@ -82,6 +86,53 @@ export interface Messages {
       rwa_unlock: string;
       completed: string;
       default: string;
+    };
+  };
+  chat: {
+    rwaTicker: {
+      title: string;
+      empty: string;
+    };
+  };
+  market: {
+    ticker: {
+      title: string;
+      cta: string;
+    };
+    status: {
+      preparing: string;
+      open: string;
+      closed: string;
+    };
+    listTitle: string;
+    listSubtitle: string;
+  };
+  rwa: {
+    tickerPrefix: string;
+    market: {
+      title: string;
+      subtitle: string;
+      loading: string;
+      empty: string;
+    };
+    type: {
+      license: string;
+      patent: string;
+      land: string;
+    };
+    item: {
+      field: {
+        type: string;
+        status: string;
+        chain: string;
+        minAllocation: string;
+        expectedYield: string;
+      };
+      status: {
+        preparing: string;
+        open: string;
+        closed: string;
+      };
     };
   };
 }
