@@ -359,7 +359,7 @@ export function ImmortalityChat() {
   };
 
   return (
-    <ThemedCard className="h-full flex flex-col overflow-hidden">
+    <ThemedCard className="w-full flex flex-col overflow-hidden min-h-[500px] max-h-[85vh] lg:min-h-[650px] lg:max-h-[calc(100vh-200px)]">
       {/* RWA Ticker */}
       <RwaTicker onSelectItem={handleRwaSelected} />
 
@@ -477,24 +477,6 @@ export function ImmortalityChat() {
           )}
           placeholder={t('immortality.chat_placeholder')}
         />
-        <ThemedButton
-          size="sm"
-          onClick={() => {
-            // Insert a payment action message with default suggested amount
-            setMessages((prev) => [
-              ...prev,
-              {
-                role: "assistant",
-                content: "Recharge Immortality Credits",
-                timestamp: new Date().toISOString(),
-                paymentAction: true,
-                suggestedAmount: 20,
-              },
-            ]);
-          }}
-        >
-          Recharge
-        </ThemedButton>
         <ThemedButton emphasis disabled={!input.trim() || chatMutation.status === "pending"} onClick={handleSend}>
           {chatMutation.status === "pending" ? (
             <>
@@ -505,6 +487,7 @@ export function ImmortalityChat() {
             t('common.send')
           )}
         </ThemedButton>
+      </div>
       </div>
     </ThemedCard>
   );
