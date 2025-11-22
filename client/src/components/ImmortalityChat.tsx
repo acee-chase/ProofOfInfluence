@@ -15,7 +15,9 @@ import {
 import { ChatPayment } from "@/components/ChatPayment";
 import { RwaTicker } from "./rwa/RwaTicker";
 import { useI18n } from "@/i18n";
-import { ImmortalityFlowStep, ImmortalityFlowState } from "@shared/immortality-flow";
+import { ImmortalityFlowStep, ImmortalityFlowState } from "../../../shared/immortality-flow";
+import { useImmortalityFlow } from "@/lib/immortality/flow/hook"; // Assuming this hook will be created or logic moved
+import type { RwaItem } from "../../../shared/types/rwa";
 import { handleImmortalityEvent, mapStepToReplyKey } from "@/lib/immortality/flow/engine";
 
 interface ActionMessage {
@@ -305,7 +307,7 @@ export function ImmortalityChat() {
 
       // Refresh balance after charging
       if (data.newBalance !== undefined) {
-        queryClient.invalidateQueries({ queryKey: ["/api/immortality/balance"] });
+        queryClient.invalidateQueries(["/api/immortality/balance"]);
       }
 
       // Auto-execute actions that have autoExecute: true
@@ -343,10 +345,23 @@ export function ImmortalityChat() {
     chatMutation.mutate(trimmed);
   };
 
+  const handleRwaSelected = (item: RwaItem) => {
+    // Just add a message for now or trigger a state change
+    setMessages((prev) => [
+        ...prev,
+        {
+            role: "user",
+            content: `I'm interested in ${item.name}`,
+            timestamp: new Date().toISOString(),
+        },
+    ]);
+    chatMutation.mutate(`I'm interested in ${item.name}`);
+  };
+
   return (
     <ThemedCard className="h-full flex flex-col overflow-hidden">
       {/* RWA Ticker */}
-      <RwaTicker />
+      <RwaTicker onSelectItem={handleRwaSelected} />
 
       <div className="flex flex-col flex-1 min-h-0 p-6">
         {/* Header - Fixed */}
@@ -388,7 +403,7 @@ export function ImmortalityChat() {
                     suggestedAmount={msg.suggestedAmount}
                     onSuccess={() => {
                       // Invalidate balance query to refresh balance after payment
-                      queryClient.invalidateQueries({ queryKey: ["/api/immortality/balance"] });
+                      queryClient.invalidateQueries(["/api/immortality/balance"]);
                     }}
                   />
                 </div>
@@ -490,7 +505,6 @@ export function ImmortalityChat() {
             t('common.send')
           )}
         </ThemedButton>
-      </div>
       </div>
     </ThemedCard>
   );
