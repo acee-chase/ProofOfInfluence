@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { useMutation, useQueryClient, useQuery } from "@tanstack/react-query";
 import { ThemedCard, ThemedButton } from "@/components/themed";
 import { useTheme } from "@/contexts/ThemeContext";
@@ -14,17 +14,20 @@ import {
 } from "@/lib/immortalityActions";
 import { ChatPayment } from "@/components/ChatPayment";
 import { RwaTicker } from "./rwa/RwaTicker";
+import { RwaRecommendationCard } from "./immortality/RwaRecommendationCard";
 import { useI18n } from "@/i18n";
+import { useLocation } from "wouter";
 import { ImmortalityFlowStep, ImmortalityFlowState } from "../../../shared/immortality-flow";
 import type { RwaItem } from "../../../shared/types/rwa";
 import { handleImmortalityEvent, mapStepToReplyKey } from "@/lib/immortality/flow/engine";
 
 interface ActionMessage {
   type: "action";
-  actionType: "activate_agent" | "upload_memory" | "mint_badge" | "pay_poi";
+  actionType: "activate_agent" | "upload_memory" | "mint_badge" | "pay_poi" | "buy_rwa";
   autoExecute: boolean;
   content: string;
   suggestedAmount?: number; // For pay_poi action
+  payload?: { rwaItemId?: string }; // For buy_rwa action
 }
 
 interface ChatMessage {
@@ -34,6 +37,7 @@ interface ChatMessage {
   actions?: ActionMessage[];
   paymentAction?: boolean; // Flag to show payment component
   suggestedAmount?: number; // Suggested amount for payment
+  rwaRecommendations?: RwaItem[]; // RWA items to recommend
 }
 
 interface ChatResponse {
@@ -59,6 +63,9 @@ export function ImmortalityChat() {
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [executingActions, setExecutingActions] = useState<Set<string>>(new Set());
+  const [processingRwaAction, setProcessingRwaAction] = useState(false);
+  const [, setLocation] = useLocation();
+  const previewTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Flow State
   const [flowState, setFlowState] = useState<ImmortalityFlowState>({
@@ -71,6 +78,15 @@ export function ImmortalityChat() {
     },
     history: [],
   });
+
+  // Cleanup timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (previewTimeoutRef.current) {
+        clearTimeout(previewTimeoutRef.current);
+      }
+    };
+  }, []);
 
   // Effect to sync auth state with flow context
   useEffect(() => {
@@ -185,6 +201,13 @@ export function ImmortalityChat() {
             return next;
           });
           return; // Early return, no backend call needed
+        case "buy_rwa":
+          const rwaItemId = action.payload?.rwaItemId;
+          if (!rwaItemId) {
+            throw new Error("Missing rwaItemId in buy_rwa action");
+          }
+          await handleRwaBuy(rwaItemId);
+          return { success: true, message: "Interest registered" };
         default:
           throw new Error(`Unknown action type: ${action.actionType}`);
       }
@@ -344,9 +367,47 @@ export function ImmortalityChat() {
     chatMutation.mutate(trimmed);
   };
 
+  const handleRwaBuy = async (rwaItemId: string) => {
+    try {
+      // TODO: Implement RWA interest registration API call
+      // For now, just add a confirmation message
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: `Thank you for your interest in this RWA asset. We'll notify you when it becomes available for purchase.`,
+          timestamp: new Date().toISOString(),
+        },
+      ]);
+
+      toast({
+        title: t('common.success'),
+        description: "Interest registered successfully",
+      });
+    } catch (error: any) {
+      console.error("[ImmortalityChat] Error registering RWA interest:", error);
+      toast({
+        title: t('common.error'),
+        description: error.message || "Failed to register interest",
+        variant: "destructive",
+      });
+    }
+  };
+
   const handleRwaSelected = (item: RwaItem) => {
+    // Prevent duplicate processing
+    if (processingRwaAction) {
+      return;
+    }
+
+    setProcessingRwaAction(true);
+
+    // Clear any pending timeout
+    if (previewTimeoutRef.current) {
+      clearTimeout(previewTimeoutRef.current);
+    }
+
     // Dispatch RWA selection event to state machine
-    // This can trigger RWA_UNLOCK step if badge is already minted
     const newState = handleImmortalityEvent(flowState, {
       rwaItemId: item.id,
     });
@@ -365,16 +426,37 @@ export function ImmortalityChat() {
       setFlowState(newState);
     }
     
-    // Add user message and trigger chat
+    // Add immediate message
     setMessages((prev) => [
       ...prev,
       {
         role: "user",
-        content: `I'm interested in ${item.name}`,
+        content: `Preview ${item.name}`,
+        timestamp: new Date().toISOString(),
+      },
+      {
+        role: "assistant",
+        content: t('immortality.rwa.opening_detail_page'),
         timestamp: new Date().toISOString(),
       },
     ]);
-    chatMutation.mutate(`I'm interested in ${item.name}. Can you tell me more about this RWA asset?`);
+
+    // Navigate to detail page
+    setLocation(`/app/rwa-market/${item.id}`);
+
+    // After 1500ms delay, add follow-up message with RWA recommendation
+    previewTimeoutRef.current = setTimeout(() => {
+      setMessages((prev) => [
+        ...prev,
+        {
+          role: "assistant",
+          content: t('immortality.rwa.after_preview_prompt'),
+          timestamp: new Date().toISOString(),
+          rwaRecommendations: [item], // Single item array
+        },
+      ]);
+      setProcessingRwaAction(false);
+    }, 1500);
   };
 
   return (
@@ -414,6 +496,20 @@ export function ImmortalityChat() {
                 {msg.role === "user" ? "You" : "Cyber Immortality"}
               </div>
               <p>{msg.content}</p>
+              
+              {/* Render RWA recommendations if present */}
+              {msg.rwaRecommendations && msg.rwaRecommendations.length > 0 && (
+                <div className="mt-3 space-y-2">
+                  {msg.rwaRecommendations.map((rwaItem) => (
+                    <RwaRecommendationCard
+                      key={rwaItem.id}
+                      item={rwaItem}
+                      onPreview={() => setLocation(`/app/rwa-market/${rwaItem.id}`)}
+                      onBuy={handleRwaBuy}
+                    />
+                  ))}
+                </div>
+              )}
               
               {/* Render payment component if paymentAction is true */}
               {msg.paymentAction && (
